@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>DIPSY BY DV — Ритуал</title>
+<style>
+  /* ---------------------------------------------------------------
+     БРЕНД-ТОКЕНИ. Міняти тут — решта підхопиться.
+     --wine взято з meta-theme-color сайту dipsybydv.com.ua
+  --------------------------------------------------------------- */
+  :root{
+    --wine:#622735;
+    --wine-soft:#8A4455;
+    --sand:#F4EDE7;
+    --cream:#FCFAF8;
+    --ink:#2A1A1E;
+    --muted:#8B7A7E;
+    --line:#E4D8D0;
+    --ok:#6E8F6B;
+    --radius:18px;
+    --font:"Georgia","Times New Roman",serif;
+    --font-ui:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0}
+  body{
+    font-family:var(--font-ui);
+    color:var(--ink);
+    background:var(--sand);
+    line-height:1.5;
+    min-height:100vh;
+  }
+
+  .app{
+    max-width:520px;
+    margin:0 auto;
+    min-height:100vh;
+    background:var(--cream);
+    display:flex;
+    flex-direction:column;
+    position:relative;
+    overflow:hidden;
+  }
+
+  /* ---------- екрани ---------- */
+  .screen{
+    display:none;
+    flex:1;
+    flex-direction:column;
+    padding:28px 24px 32px;
+    animation:fade .5s ease both;
+  }
+  .screen.active{display:flex}
+  @keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+  .eyebrow{
+    font-size:11px;letter-spacing:.18em;text-transform:uppercase;
+    color:var(--muted);margin:0 0 14px;
+  }
+  h1{font-family:var(--font);font-weight:400;font-size:30px;line-height:1.25;margin:0 0 14px;color:var(--wine)}
+  h2{font-family:var(--font);font-weight:400;font-size:23px;line-height:1.3;margin:0 0 20px;color:var(--ink)}
+  p{margin:0 0 16px;font-size:15px;color:var(--ink)}
+  .muted{color:var(--muted);font-size:13.5px}
+
+  .spacer{flex:1}
+
+  /* ---------- кнопки ---------- */
+  .btn{
+    display:block;width:100%;border:0;cursor:pointer;
+    font-family:var(--font-ui);font-size:15px;font-weight:500;
+    padding:16px 20px;border-radius:var(--radius);
+    background:var(--wine);color:#fff;
+    transition:transform .15s ease,background .2s ease;
+    text-align:center;text-decoration:none;
+  }
+  .btn:hover{background:var(--wine-soft)}
+  .btn:active{transform:scale(.985)}
+  .btn:focus-visible{outline:2px solid var(--wine);outline-offset:3px}
+  .btn.ghost{background:transparent;color:var(--muted);border:1px solid var(--line);margin-top:10px}
+  .btn.ghost:hover{background:var(--sand);color:var(--ink)}
+  .btn[disabled]{opacity:.45;cursor:not-allowed}
+
+  /* ---------- інтро-візуал ---------- */
+  .orb{
+    width:150px;height:150px;border-radius:50%;margin:10px auto 26px;
+    background:radial-gradient(circle at 34% 32%, #fff 0%, var(--sand) 42%, var(--wine-soft) 100%);
+    animation:breathe 5.5s ease-in-out infinite;
+  }
+  @keyframes breathe{0%,100%{transform:scale(1);opacity:.9}50%{transform:scale(1.07);opacity:1}}
+  @media (prefers-reduced-motion:reduce){
+    .orb{animation:none}
+    .screen{animation:none}
+  }
+
+  /* ---------- квіз ---------- */
+  .progress-dots{display:flex;gap:6px;margin-bottom:24px}
+  .dot{height:3px;flex:1;background:var(--line);border-radius:2px;transition:background .3s}
+  .dot.done{background:var(--wine)}
+
+  .options{display:flex;flex-direction:column;gap:10px}
+  .option{
+    text-align:left;width:100%;cursor:pointer;
+    border:1px solid var(--line);background:var(--cream);
+    border-radius:var(--radius);padding:16px 18px;
+    font-family:var(--font-ui);font-size:15px;color:var(--ink);
+    transition:border-color .2s,background .2s,transform .12s;
+  }
+  .option:hover{border-color:var(--wine-soft);background:var(--sand)}
+  .option:active{transform:scale(.99)}
+  .option:focus-visible{outline:2px solid var(--wine);outline-offset:2px}
+
+  /* ---------- результат ---------- */
+  .card{
+    border:1px solid var(--line);border-radius:var(--radius);
+    padding:22px;background:var(--sand);margin-bottom:20px;
+  }
+  .card .kicker{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--wine-soft);margin-bottom:8px}
+  .card h3{font-family:var(--font);font-weight:400;font-size:21px;margin:0 0 10px;color:var(--wine)}
+  .card p{font-size:14.5px;margin:0}
+
+  /* ---------- камера ---------- */
+  .stage{
+    position:relative;width:100%;aspect-ratio:3/4;
+    background:#1A1013;border-radius:var(--radius);overflow:hidden;margin-bottom:18px;
+  }
+  #video,#overlay{
+    position:absolute;inset:0;width:100%;height:100%;
+    object-fit:cover;transform:scaleX(-1);
+  }
+  .stage-msg{
+    position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    text-align:center;padding:28px;color:#F4EDE7;font-size:14px;line-height:1.5;
+    background:rgba(26,16,19,.72);z-index:3;
+  }
+  .stage-msg[hidden]{display:none}
+
+  .hud{
+    position:absolute;left:0;right:0;bottom:0;z-index:2;
+    padding:16px 18px;
+    background:linear-gradient(to top,rgba(26,16,19,.85),transparent);
+    color:#fff;display:flex;align-items:flex-end;justify-content:space-between;gap:14px;
+  }
+  .count{font-family:var(--font);font-size:34px;line-height:1}
+  .count small{font-size:15px;color:rgba(255,255,255,.65)}
+  .hint{font-size:12.5px;color:rgba(255,255,255,.8);text-align:right;max-width:56%}
+
+  .ring{position:absolute;top:14px;right:14px;z-index:2}
+  .ring circle{fill:none;stroke-width:3.5}
+  .ring .bg{stroke:rgba(255,255,255,.22)}
+  .ring .fg{stroke:#F4EDE7;stroke-linecap:round;transition:stroke-dashoffset .1s linear}
+
+  .steps{margin:0 0 18px;padding-left:18px;font-size:14.5px;color:var(--ink)}
+  .steps li{margin-bottom:8px}
+
+  .final-mark{
+    width:64px;height:64px;border-radius:50%;margin:0 auto 20px;
+    border:1.5px solid var(--ok);display:flex;align-items:center;justify-content:center;
+    color:var(--ok);font-size:26px;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ============ 1. ІНТРО ============ -->
+  <section class="screen active" id="s-intro">
+    <p class="eyebrow">DIPSY BY DV</p>
+    <div class="orb" aria-hidden="true"></div>
+    <h1>Ритуал починається<br>не з покупки</h1>
+    <p>Дві хвилини. Кілька питань про те, як ви зараз. Далі — короткий ритуал для рук, який ми пройдемо разом.</p>
+    <p class="muted">Друга частина використовує камеру, щоб рахувати рухи. Відео залишається у вашому браузері й нікуди не надсилається.</p>
+    <div class="spacer"></div>
+    <button class="btn" id="go-quiz">Почати</button>
+  </section>
+
+  <!-- ============ 2. КВІЗ ============ -->
+  <section class="screen" id="s-quiz">
+    <div class="progress-dots" id="dots" role="progressbar" aria-label="Прогрес квізу"></div>
+    <p class="eyebrow" id="q-num"></p>
+    <h2 id="q-text"></h2>
+    <div class="options" id="q-options"></div>
+    <div class="spacer"></div>
+    <button class="btn ghost" id="q-back">Назад</button>
+  </section>
+
+  <!-- ============ 3. РЕЗУЛЬТАТ КВІЗУ ============ -->
+  <section class="screen" id="s-result">
+    <p class="eyebrow">Ваш профіль</p>
+    <h1 id="r-title"></h1>
+    <p id="r-mood"></p>
+    <div class="card">
+      <div class="kicker">Ваш продукт</div>
+      <h3 id="r-product"></h3>
+      <p id="r-why"></p>
+    </div>
+    <p class="muted" id="r-scent"></p>
+    <div class="spacer"></div>
+    <button class="btn" id="go-ritual">Пройти ритуал</button>
+    <a class="btn ghost" id="r-link" href="#" target="_blank" rel="noopener">Подивитись у каталозі</a>
+  </section>
+
+  <!-- ============ 4. ПІДГОТОВКА ДО РИТУАЛУ ============ -->
+  <section class="screen" id="s-prep">
+    <p class="eyebrow">Ритуал</p>
+    <h2 id="p-title"></h2>
+    <ol class="steps">
+      <li>Візьміть трохи засобу (або просто складіть долоні — ритуал працює і без нього).</li>
+      <li>Тримайте камеру так, щоб долоня була у кадрі повністю.</li>
+      <li>Робіть повільні кругові рухи долонею — так, ніби розтираєте крем.</li>
+      <li>Дихайте рівно. Ми порахуємо кола за вас.</li>
+    </ol>
+    <p class="muted">Браузер запитає дозвіл на камеру. Відео обробляється локально, нічого не завантажується на сервер.</p>
+    <div class="spacer"></div>
+    <button class="btn" id="start-cam">Увімкнути камеру</button>
+    <button class="btn ghost" id="skip-cam">Пройти без камери</button>
+  </section>
+
+  <!-- ============ 5. РИТУАЛ (КАМЕРА) ============ -->
+  <section class="screen" id="s-ritual">
+    <p class="eyebrow">Ритуал · <span id="rit-name"></span></p>
+    <div class="stage">
+      <video id="video" playsinline muted autoplay></video>
+      <canvas id="overlay"></canvas>
+      <svg class="ring" width="46" height="46" viewBox="0 0 46 46" aria-hidden="true">
+        <circle class="bg" cx="23" cy="23" r="20"></circle>
+        <circle class="fg" id="ring-fg" cx="23" cy="23" r="20"
+                transform="rotate(-90 23 23)" stroke-dasharray="125.66" stroke-dashoffset="125.66"></circle>
+      </svg>
+      <div class="stage-msg" id="stage-msg">Готуємо камеру…</div>
+      <div class="hud">
+        <div class="count"><span id="rep-count">0</span><small> / <span id="rep-goal">8</span> кіл</small></div>
+        <div class="hint" id="rit-hint">Покажіть долоню в кадрі</div>
+      </div>
+    </div>
+    <p class="muted" id="rit-cue">Вдих на коло, видих на коло.</p>
+    <div class="spacer"></div>
+    <button class="btn ghost" id="quit-ritual">Завершити раніше</button>
+  </section>
+
+  <!-- ============ 6. РИТУАЛ БЕЗ КАМЕРИ ============ -->
+  <section class="screen" id="s-breathe">
+    <p class="eyebrow">Ритуал · без камери</p>
+    <h2>Просто дихайте разом з колом</h2>
+    <div class="orb" id="breathe-orb"></div>
+    <p style="text-align:center;font-size:17px" id="breathe-text">Вдих</p>
+    <p class="muted" style="text-align:center">Залишилось: <span id="breathe-left">60</span> с</p>
+    <div class="spacer"></div>
+    <button class="btn ghost" id="quit-breathe">Завершити раніше</button>
+  </section>
+
+  <!-- ============ 7. ФІНАЛ ============ -->
+  <section class="screen" id="s-final">
+    <div class="final-mark" aria-hidden="true">✓</div>
+    <h1 style="text-align:center">Ритуал завершено</h1>
+    <p style="text-align:center" id="f-summary"></p>
+    <div class="card">
+      <div class="kicker">Підібрано для вас</div>
+      <h3 id="f-product"></h3>
+      <p id="f-why"></p>
+    </div>
+    <div class="spacer"></div>
+    <a class="btn" id="f-link" href="#" target="_blank" rel="noopener">Перейти в каталог</a>
+    <button class="btn ghost" id="restart">Пройти ще раз</button>
+  </section>
+
+</div>
+
+<script type="module">
+/* =================================================================
+   КОНФІГ
+   Категорії й посилання — реальні, з dipsybydv.com.ua.
+   Назви конкретних продуктів свідомо НЕ вигадані: тут типи продуктів
+   з каталогу. Замінити на реальні SKU + фото — окремий крок.
+   ================================================================= */
+
+const PRODUCTS = {
+  calm: {
+    title:'Тиша',
+    mood:'Вам зараз потрібно не збадьоритись, а сповільнитись.',
+    product:'Парфумована свічка + лосьйон для тіла',
+    why:'Тепле світло й ламелярна емульсія працюють в одному напрямку: знижують темп. Свічку запалюємо за 10 хвилин до догляду — аромат встигає розкритись.',
+    scent:'Шукайте глибокі, теплі, деревні акорди.',
+    url:'https://dipsybydv.com.ua/aromasvichki',
+    ritual:'Долоні та зап\'ястя',
+    cue:'Повільніше, ніж хочеться. Вдих на коло, видих на коло.'
+  },
+  restore: {
+    title:'Відновлення',
+    mood:'Шкіра просить не аромату, а ремонту барʼєру.',
+    product:'Крем для рук з церамідним комплексом',
+    why:'Церамідний комплекс і пре-/пробіотики відновлюють захисний барʼєр і утримують вологу. Ніацинамід додає рівності тону.',
+    scent:'Мінімум парфуму, максимум текстури.',
+    url:'https://dipsybydv.com.ua/tilo-i-vanna',
+    ritual:'Кисті та нігтьові валики',
+    cue:'Затримайтесь на кожному пальці. Це не поспіх.'
+  },
+  awaken: {
+    title:'Пробудження',
+    mood:'Вам бракує не спокою, а відчуття власного тіла.',
+    product:'Скраб для тіла + безсульфатний гель для душу',
+    why:'Скраб повертає чутливість шкіри, гель без сульфатів не змиває природний ліпідний шар. Разом — бадьорість без сухості.',
+    scent:'Цитрусові й зелені ноти працюють найкраще зранку.',
+    url:'https://dipsybydv.com.ua/tilo-i-vanna',
+    ritual:'Передпліччя та долоні',
+    cue:'Рухи ширші й енергійніші. Відчуйте шкіру.'
+  },
+  comfort: {
+    title:'Затишок',
+    mood:'Схоже, вам бракує відчуття дому — і тіло це помічає першим.',
+    product:'Лосьйон для тіла + парфумована свічка',
+    why:'Ламелярна основа з рослинними оліями дає щільний, огортаючий комфорт, а сквалан не лишає липкості. Аромат добудовує відчуття простору.',
+    scent:'Ваніль, мигдаль, мʼякі гурманські акорди.',
+    url:'https://dipsybydv.com.ua/new',
+    ritual:'Долоні та передпліччя',
+    cue:'Уявіть, що зігріваєте руки. Не поспішайте.'
+  }
+};
+
+const QUIZ = [
+  {
+    q:'Як почалась ваша сьогоднішня доба?',
+    a:[
+      {t:'Прокинулась ще втомленою',    s:{restore:2, calm:1}},
+      {t:'Одразу в справи, без паузи',  s:{calm:2, comfort:1}},
+      {t:'Нормально, але якось сіро',   s:{awaken:2, comfort:1}},
+      {t:'Добре, хочу це втримати',     s:{comfort:2, awaken:1}}
+    ]
+  },
+  {
+    q:'Де у тілі ви зараз відчуваєте найбільше напруження?',
+    a:[
+      {t:'Щелепа, скроні, чоло',        s:{calm:2}},
+      {t:'Плечі й шия',                 s:{calm:1, comfort:2}},
+      {t:'Руки — сухі, стягнуті',       s:{restore:3}},
+      {t:'Ніде особливо, просто важко зібратись', s:{awaken:2}}
+    ]
+  },
+  {
+    q:'Якого дотику вам зараз бракує?',
+    a:[
+      {t:'Теплого й огортаючого',       s:{comfort:3}},
+      {t:'Прохолодного й бадьорого',    s:{awaken:3}},
+      {t:'Дуже мʼякого, майже непомітного', s:{restore:2, calm:1}},
+      {t:'Щільного, відчутного',        s:{awaken:1, comfort:2}}
+    ]
+  },
+  {
+    q:'Скільки часу ви реально готові присвятити собі сьогодні?',
+    a:[
+      {t:'Дві хвилини, не більше',      s:{restore:2}},
+      {t:'Хвилин десять',               s:{comfort:1, awaken:1}},
+      {t:'Півгодини, з ванною',         s:{calm:2, comfort:1}},
+      {t:'Скільки треба — я вирішила зупинитись', s:{calm:3}}
+    ]
+  }
+];
+
+const REP_GOAL = 8;          // скільки кіл до завершення ритуалу
+const BREATHE_SECONDS = 60;  // тривалість ритуалу без камери
+
+/* =================================================================
+   НАВІГАЦІЯ
+   ================================================================= */
+const $ = s => document.querySelector(s);
+const screens = [...document.querySelectorAll('.screen')];
+function show(id){
+  screens.forEach(s => s.classList.toggle('active', s.id === id));
+  window.scrollTo(0,0);
+}
+
+/* =================================================================
+   КВІЗ
+   ================================================================= */
+let qIndex = 0;
+let answers = [];
+
+function renderDots(){
+  $('#dots').innerHTML = QUIZ.map((_,i)=>
+    `<div class="dot ${i <= qIndex ? 'done':''}"></div>`).join('');
+}
+
+function renderQuestion(){
+  const item = QUIZ[qIndex];
+  renderDots();
+  $('#q-num').textContent = `Питання ${qIndex+1} з ${QUIZ.length}`;
+  $('#q-text').textContent = item.q;
+  $('#q-options').innerHTML = '';
+  item.a.forEach((opt,i)=>{
+    const b = document.createElement('button');
+    b.className = 'option';
+    b.type = 'button';
+    b.textContent = opt.t;
+    b.addEventListener('click', ()=> answer(i));
+    $('#q-options').appendChild(b);
+  });
+  $('#q-back').textContent = qIndex === 0 ? 'На початок' : 'Назад';
+}
+
+function answer(i){
+  answers[qIndex] = i;
+  if (qIndex < QUIZ.length - 1){
+    qIndex++;
+    renderQuestion();
+  } else {
+    finishQuiz();
+  }
+}
+
+function scoreQuiz(){
+  const totals = {calm:0, restore:0, awaken:0, comfort:0};
+  answers.forEach((ai, qi)=>{
+    const s = QUIZ[qi].a[ai].s;
+    for (const k in s) totals[k] += s[k];
+  });
+  // при рівному рахунку виграє той, хто раніше в списку — детермінований результат
+  return Object.keys(totals).reduce((best,k)=> totals[k] > totals[best] ? k : best, 'calm');
+}
+
+let chosen = null;
+
+function finishQuiz(){
+  chosen = PRODUCTS[scoreQuiz()];
+  $('#r-title').textContent   = chosen.title;
+  $('#r-mood').textContent    = chosen.mood;
+  $('#r-product').textContent = chosen.product;
+  $('#r-why').textContent     = chosen.why;
+  $('#r-scent').textContent   = chosen.scent;
+  $('#r-link').href           = chosen.url;
+  $('#p-title').textContent   = chosen.ritual;
+  $('#rit-name').textContent  = chosen.ritual;
+  $('#rit-cue').textContent   = chosen.cue;
+  show('s-result');
+}
+
+$('#go-quiz').addEventListener('click', ()=>{
+  qIndex = 0; answers = [];
+  renderQuestion();
+  show('s-quiz');
+});
+
+$('#q-back').addEventListener('click', ()=>{
+  if (qIndex === 0){ show('s-intro'); return; }
+  qIndex--;
+  renderQuestion();
+});
+
+$('#go-ritual').addEventListener('click', ()=> show('s-prep'));
+
+/* =================================================================
+   ДЕТЕКТОР КРУГОВИХ РУХІВ
+
+   Ідея: центр долоні описує коло. Беремо ковзне вікно останніх точок,
+   рахуємо їхній центроїд, і дивимось на кут поточної точки відносно
+   центроїда. Накопичуємо зміну кута; коли |accum| >= 2π — це одне коло.
+
+   Захисти від хибних спрацювань:
+   - радіус має бути не менший за частку розміру долоні (жест, а не тремтіння);
+   - стрибки кута більші за MAX_STEP ігноруємо (втрата трекінгу);
+   - зміна напрямку зменшує accum природним чином, тож махання туди-сюди
+     не накрутить лічильник.
+   ================================================================= */
+class CircleCounter {
+  constructor(opts = {}){
+    this.windowMs      = opts.windowMs      ?? 1100; // довжина ковзного вікна
+    this.minRadiusRatio= opts.minRadiusRatio?? 0.22; // радіус як частка розміру долоні
+    this.maxStep       = opts.maxStep       ?? 0.9;  // рад/кадр, більше = збій трекінгу
+    this.smoothing     = opts.smoothing     ?? 0.45; // EMA згладжування центру долоні
+    this.reset();
+  }
+  reset(){
+    this.history = [];
+    this.prevAngle = null;
+    this.accum = 0;
+    this.smoothed = null;
+    this.reps = 0;
+    this.progress = 0;
+  }
+  /** @param {{x:number,y:number}} palm  ізотропні координати
+      @param {number} handSize  масштаб долоні в тих самих одиницях
+      @param {number} t  час у мс */
+  update(palm, handSize, t){
+    // згладжування, щоб дрібний шум landmarks не крутив кут
+    if (!this.smoothed) this.smoothed = {x:palm.x, y:palm.y};
+    else {
+      const k = this.smoothing;
+      this.smoothed = {
+        x: this.smoothed.x + (palm.x - this.smoothed.x) * k,
+        y: this.smoothed.y + (palm.y - this.smoothed.y) * k
+      };
+    }
+    const p = this.smoothed;
+
+    this.history.push({x:p.x, y:p.y, t});
+    while (this.history.length && t - this.history[0].t > this.windowMs) this.history.shift();
+    if (this.history.length < 6) return this.status('collecting');
+
+    // центроїд вікна — це і є центр кола, яке малює долоня
+    let cx = 0, cy = 0;
+    for (const h of this.history){ cx += h.x; cy += h.y; }
+    cx /= this.history.length; cy /= this.history.length;
+
+    const dx = p.x - cx, dy = p.y - cy;
+    const radius = Math.hypot(dx, dy);
+
+    // замалий радіус — рука просто висить у кадрі
+    if (radius < this.minRadiusRatio * handSize){
+      this.prevAngle = null;
+      return this.status('too-small');
+    }
+
+    const angle = Math.atan2(dy, dx);
+    if (this.prevAngle !== null){
+      let d = angle - this.prevAngle;
+      while (d >  Math.PI) d -= 2 * Math.PI;   // нормалізація в (-π, π]
+      while (d < -Math.PI) d += 2 * Math.PI;
+      if (Math.abs(d) <= this.maxStep){
+        this.accum += d;
+        if (Math.abs(this.accum) >= 2 * Math.PI){
+          this.reps++;
+          this.accum -= Math.sign(this.accum) * 2 * Math.PI; // лишок переносимо
+        }
+      }
+    }
+    this.prevAngle = angle;
+    this.progress = Math.min(1, Math.abs(this.accum) / (2 * Math.PI));
+    return this.status('tracking', {cx, cy, radius});
+  }
+  /** рука зникла з кадру */
+  lost(){
+    this.prevAngle = null;
+    this.history = [];
+    this.smoothed = null;
+    this.accum *= 0.5; // мʼяко забуваємо незавершене коло, але не обнуляємо різко
+    this.progress = Math.min(1, Math.abs(this.accum) / (2 * Math.PI));
+    return this.status('lost');
+  }
+  status(state, extra){
+    return {state, reps:this.reps, progress:this.progress, ...extra};
+  }
+}
+
+/* =================================================================
+   MEDIAPIPE + ЦИКЛ КАМЕРИ
+   ================================================================= */
+const video   = $('#video');
+const overlay = $('#overlay');
+const ctx     = overlay.getContext('2d');
+const msgBox  = $('#stage-msg');
+
+let handLandmarker = null;
+let stream = null;
+let rafId = null;
+let lastVideoTime = -1;
+const counter = new CircleCounter();
+
+const RING_LEN = 125.66;
+function setRing(p){ $('#ring-fg').style.strokeDashoffset = String(RING_LEN * (1 - p)); }
+function setMsg(text){
+  if (text === null){ msgBox.hidden = true; }
+  else { msgBox.textContent = text; msgBox.hidden = false; }
+}
+
+async function loadModel(){
+  if (handLandmarker) return handLandmarker;
+  const { FilesetResolver, HandLandmarker } =
+    await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs');
+  const vision = await FilesetResolver.forVisionTasks(
+    'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm');
+  handLandmarker = await HandLandmarker.createFromOptions(vision, {
+    baseOptions:{
+      modelAssetPath:'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task',
+      delegate:'GPU'
+    },
+    runningMode:'VIDEO',
+    numHands:1
+  });
+  return handLandmarker;
+}
+
+async function startRitual(){
+  show('s-ritual');
+  counter.reset();
+  $('#rep-goal').textContent = REP_GOAL;
+  $('#rep-count').textContent = '0';
+  setRing(0);
+  setMsg('Готуємо камеру…');
+
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video:{ facingMode:'user', width:{ideal:640}, height:{ideal:480} },
+      audio:false
+    });
+  } catch(err){
+    setMsg('Не вдалося отримати доступ до камери. Можна пройти ритуал без неї — натисніть «Завершити раніше» і оберіть варіант без камери.');
+    return;
+  }
+
+  video.srcObject = stream;
+  await video.play().catch(()=>{});
+
+  setMsg('Завантажуємо модель…');
+  try {
+    await loadModel();
+  } catch(err){
+    setMsg('Не вдалося завантажити модель розпізнавання. Перевірте зʼєднання з інтернетом.');
+    return;
+  }
+
+  setMsg(null);
+  $('#rit-hint').textContent = 'Покажіть долоню в кадрі';
+  loop();
+}
+
+function loop(){
+  rafId = requestAnimationFrame(loop);
+  if (!handLandmarker || video.readyState < 2) return;
+  if (video.currentTime === lastVideoTime) return;
+  lastVideoTime = video.currentTime;
+
+  // canvas у пікселях відео, щоб малювати в тих самих координатах
+  if (overlay.width !== video.videoWidth){
+    overlay.width  = video.videoWidth;
+    overlay.height = video.videoHeight;
+  }
+
+  const res = handLandmarker.detectForVideo(video, performance.now());
+  ctx.clearRect(0,0,overlay.width,overlay.height);
+
+  const aspect = video.videoWidth / video.videoHeight;
+  let out;
+
+  if (res.landmarks && res.landmarks.length){
+    const lm = res.landmarks[0];
+    // ізотропний простір: x множимо на aspect, інакше кола стають еліпсами
+    const iso = i => ({ x: lm[i].x * aspect, y: lm[i].y });
+    const w = iso(0), i5 = iso(5), i17 = iso(17), i9 = iso(9);
+    const palm = { x:(w.x + i5.x + i17.x)/3, y:(w.y + i5.y + i17.y)/3 };
+    const handSize = Math.hypot(i9.x - w.x, i9.y - w.y) || 0.1;
+
+    out = counter.update(palm, handSize, performance.now());
+    drawHand(lm, out, aspect);
+  } else {
+    out = counter.lost();
+  }
+
+  $('#rep-count').textContent = out.reps;
+  setRing(out.progress);
+  $('#rit-hint').textContent = hintFor(out.state);
+
+  if (out.reps >= REP_GOAL) completeRitual(out.reps);
+}
+
+function hintFor(state){
+  switch(state){
+    case 'lost':       return 'Долоня вийшла з кадру';
+    case 'too-small':  return 'Робіть ширші кругові рухи';
+    case 'collecting': return 'Починайте рухатись по колу';
+    default:           return 'Добре. Тримайте темп';
+  }
+}
+
+function drawHand(lm, out, aspect){
+  const W = overlay.width, H = overlay.height;
+  // точки долоні
+  ctx.fillStyle = 'rgba(244,237,231,.85)';
+  for (const p of lm){
+    ctx.beginPath();
+    ctx.arc(p.x * W, p.y * H, 3.2, 0, Math.PI*2);
+    ctx.fill();
+  }
+  // коло, яке система бачить зараз
+  if (out.state === 'tracking'){
+    ctx.strokeStyle = 'rgba(244,237,231,.55)';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([6,7]);
+    ctx.beginPath();
+    ctx.arc((out.cx / aspect) * W, out.cy * H, out.radius * H, 0, Math.PI*2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+}
+
+function stopCamera(){
+  if (rafId) cancelAnimationFrame(rafId);
+  rafId = null;
+  if (stream){ stream.getTracks().forEach(t => t.stop()); stream = null; }
+  video.srcObject = null;
+  lastVideoTime = -1;
+}
+
+function completeRitual(reps){
+  stopCamera();
+  finish(`${reps} кіл, повільно й уважно. Шкіра встигла все ввібрати.`);
+}
+
+$('#start-cam').addEventListener('click', startRitual);
+$('#quit-ritual').addEventListener('click', ()=>{
+  const reps = counter.reps;
+  stopCamera();
+  finish(reps > 0
+    ? `${reps} кіл. Навіть коротка пауза рахується.`
+    : 'Пауза теж рахується.');
+});
+
+/* =================================================================
+   РИТУАЛ БЕЗ КАМЕРИ
+   ================================================================= */
+let breatheTimer = null;
+$('#skip-cam').addEventListener('click', ()=>{
+  let left = BREATHE_SECONDS;
+  $('#breathe-left').textContent = left;
+  show('s-breathe');
+  const phase = ['Вдих','Затримка','Видих','Пауза'];
+  let pi = 0;
+  $('#breathe-text').textContent = phase[0];
+  clearInterval(breatheTimer);
+  breatheTimer = setInterval(()=>{
+    left--;
+    $('#breathe-left').textContent = Math.max(0,left);
+    if (left % 3 === 0){ pi = (pi + 1) % phase.length; $('#breathe-text').textContent = phase[pi]; }
+    if (left <= 0){
+      clearInterval(breatheTimer);
+      finish('Хвилина усвідомленого дихання. Це вже ритуал.');
+    }
+  }, 1000);
+});
+$('#quit-breathe').addEventListener('click', ()=>{
+  clearInterval(breatheTimer);
+  finish('Пауза теж рахується.');
+});
+
+/* =================================================================
+   ФІНАЛ
+   ================================================================= */
+function finish(summary){
+  $('#f-summary').textContent = summary;
+  $('#f-product').textContent = chosen ? chosen.product : '';
+  $('#f-why').textContent     = chosen ? chosen.why : '';
+  $('#f-link').href           = chosen ? chosen.url : 'https://dipsybydv.com.ua/';
+  show('s-final');
+}
+
+$('#restart').addEventListener('click', ()=>{
+  stopCamera();
+  clearInterval(breatheTimer);
+  counter.reset();
+  qIndex = 0; answers = []; chosen = null;
+  show('s-intro');
+});
+
+// не тримаємо камеру увімкненою, якщо вкладку сховали
+document.addEventListener('visibilitychange', ()=>{
+  if (document.hidden && stream) stopCamera();
+});
+</script>
+</body>
+</html>
