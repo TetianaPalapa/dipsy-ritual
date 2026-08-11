@@ -109,7 +109,7 @@
 `file://` **не працює** — блокуються і камера, і ES-модулі з CDN. Варіанти:
 
 - перетягнути папку на app.netlify.com/drop → HTTPS-лінк, тестувати з телефона
-- або `python -m http.server 8000` → localhost:8000
+- або `python -m http.server 8001` → localhost:8001
 
 Вбудовування у Weblium:
 

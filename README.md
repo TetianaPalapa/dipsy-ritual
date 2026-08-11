@@ -16,9 +16,9 @@
 
 ```
 cd dipsy-ritual
-python -m http.server 8000
+python -m http.server 8001
 ```
-далі http://localhost:8000
+далі http://localhost:8001
 
 ## Що вже працює
 

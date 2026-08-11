@@ -136,6 +136,7 @@
     background:rgba(26,16,19,.72);z-index:3;
   }
   .stage-msg[hidden]{display:none}
+  #face-ready{z-index:4}
 
   .hud{
     position:absolute;left:0;right:0;bottom:0;z-index:2;
@@ -151,6 +152,17 @@
   .ring circle{fill:none;stroke-width:3.5}
   .ring .bg{stroke:rgba(255,255,255,.22)}
   .ring .fg{stroke:#F4EDE7;stroke-linecap:round;transition:stroke-dashoffset .1s linear}
+  .stage--face .hud .count,
+  .stage--face .ring{display:none}
+  .zone-bar{height:3px;background:var(--line);border-radius:2px;overflow:hidden;margin:-8px 0 16px}
+  .zone-bar-fill{height:100%;width:0%;background:var(--wine);border-radius:2px;transition:width .12s linear}
+  .sound-toggle{
+    border:0;cursor:pointer;background:rgba(26,16,19,.55);color:#fff;
+    width:34px;height:34px;border-radius:50%;font-size:15px;line-height:1;
+    display:flex;align-items:center;justify-content:center;flex:0 0 34px;
+  }
+  .sound-toggle.is-muted{opacity:.5}
+  .sound-toggle-standalone{position:static;margin:0 auto 14px;background:var(--wine);}
 
   .steps{margin:0 0 18px;padding-left:18px;font-size:14.5px;color:var(--ink)}
   .steps li{margin-bottom:8px}
@@ -163,6 +175,7 @@
 </style>
 </head>
 <body>
+<audio id="ritual-audio" loop preload="none"></audio>
 <div class="app">
 
   <!-- ============ 1. ІНТРО ============ -->
@@ -198,21 +211,18 @@
     </div>
     <p class="muted" id="r-scent"></p>
     <div class="spacer"></div>
-    <button class="btn" id="go-ritual">Пройти ритуал</button>
+    <button class="btn" id="go-ritual-hand">Ритуал для рук</button>
+    <button class="btn ghost" id="go-ritual-face">Ритуал для обличчя</button>
     <a class="btn ghost" id="r-link" href="#" target="_blank" rel="noopener">Подивитись у каталозі</a>
   </section>
 
   <!-- ============ 4. ПІДГОТОВКА ДО РИТУАЛУ ============ -->
   <section class="screen" id="s-prep">
-    <p class="eyebrow">Ритуал</p>
+    <p class="eyebrow" id="p-eyebrow">Ритуал</p>
     <h2 id="p-title"></h2>
-    <ol class="steps">
-      <li>Візьміть трохи засобу (або просто складіть долоні — ритуал працює і без нього).</li>
-      <li>Тримайте камеру так, щоб долоня була у кадрі повністю.</li>
-      <li>Робіть повільні кругові рухи долонею — так, ніби розтираєте крем.</li>
-      <li>Дихайте рівно. Ми порахуємо кола за вас.</li>
-    </ol>
-    <p class="muted">Браузер запитає дозвіл на камеру. Відео обробляється локально, нічого не завантажується на сервер.</p>
+    <ol class="steps" id="p-steps"></ol>
+    <p class="muted" id="p-note" hidden></p>
+    <p class="muted" id="p-privacy"></p>
     <div class="spacer"></div>
     <button class="btn" id="start-cam">Увімкнути камеру</button>
     <button class="btn ghost" id="skip-cam">Пройти без камери</button>
@@ -230,12 +240,21 @@
                 transform="rotate(-90 23 23)" stroke-dasharray="125.66" stroke-dashoffset="125.66"></circle>
       </svg>
       <div class="stage-msg" id="stage-msg">Готуємо камеру…</div>
+      <div class="stage-msg" id="face-ready" hidden>
+        <div>
+          <button class="btn" id="face-ready-go" style="display:inline-block;width:auto;padding:12px 28px">Починаємо</button>
+          <p class="muted" style="margin:16px 0 0;font-size:12.5px;color:rgba(244,237,231,.7)">Відео не записується й не покидає ваш браузер.</p>
+        </div>
+      </div>
       <div class="hud">
         <div class="count"><span id="rep-count">0</span><small> / <span id="rep-goal">8</span> кіл</small></div>
         <div class="hint" id="rit-hint">Покажіть долоню в кадрі</div>
+        <button class="sound-toggle" id="sound-toggle-ritual" type="button" aria-label="Керування звуком">♪</button>
       </div>
     </div>
     <p class="muted" id="rit-cue">Вдих на коло, видих на коло.</p>
+    <p class="muted" id="zone-label" hidden></p>
+    <div class="zone-bar" id="zone-bar" hidden><div class="zone-bar-fill" id="zone-bar-fill"></div></div>
     <div class="spacer"></div>
     <button class="btn ghost" id="quit-ritual">Завершити раніше</button>
   </section>
@@ -248,6 +267,7 @@
     <p style="text-align:center;font-size:17px" id="breathe-text">Вдих</p>
     <p class="muted" style="text-align:center">Залишилось: <span id="breathe-left">60</span> с</p>
     <div class="spacer"></div>
+    <button class="sound-toggle sound-toggle-standalone" id="sound-toggle-breathe" type="button" aria-label="Керування звуком">♪</button>
     <button class="btn ghost" id="quit-breathe">Завершити раніше</button>
   </section>
 
@@ -257,7 +277,7 @@
     <h1 style="text-align:center">Ритуал завершено</h1>
     <p style="text-align:center" id="f-summary"></p>
     <div class="card">
-      <div class="kicker">Підібрано для вас</div>
+      <div class="kicker" id="f-kicker">Підібрано для вас</div>
       <h3 id="f-product"></h3>
       <p id="f-why"></p>
     </div>
@@ -319,6 +339,12 @@ const PRODUCTS = {
   }
 };
 
+const FACE_BRIDGE = {
+  title: 'Парфумована свічка для ритуалу',
+  why: 'Лінійка для обличчя ще готується. А поки — свічка добре підтримує сам ритуал: запаліть її на 10 хвилин раніше наступного разу, і легкий рух стане ще спокійнішим.',
+  url: 'https://dipsybydv.com.ua/aromasvichki'
+};
+
 const QUIZ = [
   {
     q:'Як почалась ваша сьогоднішня доба?',
@@ -361,6 +387,40 @@ const QUIZ = [
 const REP_GOAL = 8;          // скільки кіл до завершення ритуалу
 const BREATHE_SECONDS = 60;  // тривалість ритуалу без камери
 
+const ZONE_DURATION_MS = 15000; // тривалість однієї зони, підлаштувати після тесту
+// Індекси landmarks перевірені на живому обличчі; калібрування — ?debugLandmarks=1
+const MASSAGE_ZONES = [
+  {
+    id: 'forehead',
+    label: 'Лоб → скроні',
+    technique: 'Подушечками двох пальців, легко — від центру до скронь',
+    strokes: [
+      [9, 107, 68, 127],
+      [9, 336, 298, 356]
+    ]
+  },
+  {
+    id: 'cheeks',
+    label: 'Щоки: ніс → вуха',
+    technique: 'Подушечками пальців, ковзний рух — від носа до вух',
+    strokes: [
+      [98, 50, 234],
+      [327, 280, 454]
+    ]
+  },
+  {
+    id: 'jaw',
+    label: 'Щелепа → шия',
+    technique: 'Подушечками пальців — від підборіддя вздовж щелепи до вуха й донизу',
+    strokes: [
+      [172, 136, 152, 365, 397]
+    ],
+    extrapolate: 'both'
+  }
+];
+const DEBUG_LANDMARKS = new URLSearchParams(location.search).get('debugLandmarks') === '1';
+const DEBUG_FACE_SIGNALS = new URLSearchParams(location.search).get('debugFace') === '1';
+
 /* =================================================================
    НАВІГАЦІЯ
    ================================================================= */
@@ -376,6 +436,44 @@ function show(id){
    ================================================================= */
 let qIndex = 0;
 let answers = [];
+let ritualType = null; // 'hand' | 'face'
+const RITUAL_TRACKS = ['audio/ritual-01.mp3', 'audio/ritual-02.mp3', 'audio/ritual-03.mp3'];
+let soundMuted = sessionStorage.getItem('dipsy-sound-muted') === '1';
+let lastTrack = null;
+const ritualAudio = $('#ritual-audio');
+ritualAudio.muted = soundMuted;
+
+function pickTrack(){
+  if (RITUAL_TRACKS.length === 1) return RITUAL_TRACKS[0];
+  let choice;
+  do { choice = RITUAL_TRACKS[Math.floor(Math.random() * RITUAL_TRACKS.length)]; }
+  while (choice === lastTrack);
+  lastTrack = choice;
+  return choice;
+}
+function updateSoundToggles(){
+  document.querySelectorAll('.sound-toggle').forEach(btn=>{
+    btn.classList.toggle('is-muted', soundMuted);
+    btn.textContent = soundMuted ? '✕' : '♪';
+  });
+}
+function playRitualAudio(){
+  ritualAudio.muted = soundMuted;
+  ritualAudio.src = pickTrack();
+  ritualAudio.currentTime = 0;
+  ritualAudio.play().catch(()=>{}); // тихо ігноруємо — блокування браузером чи інша перешкода, не критично
+}
+function stopRitualAudio(){
+  ritualAudio.pause();
+}
+function toggleSound(){
+  soundMuted = !soundMuted;
+  sessionStorage.setItem('dipsy-sound-muted', soundMuted ? '1' : '0');
+  ritualAudio.muted = soundMuted;
+  updateSoundToggles();
+}
+document.querySelectorAll('.sound-toggle').forEach(btn => btn.addEventListener('click', toggleSound));
+updateSoundToggles();
 
 function renderDots(){
   $('#dots').innerHTML = QUIZ.map((_,i)=>
@@ -421,6 +519,51 @@ function scoreQuiz(){
 
 let chosen = null;
 
+const PREP_COPY = {
+  hand: {
+    eyebrow: 'Ритуал',
+    // ritualLabel / ritualCue — з chosen.ritual / chosen.cue під час старту
+    steps: [
+      'Поставте телефон стійко — сперте об щось або на підставку. Обидві руки будуть зайняті.',
+      'Візьміть трохи засобу (або просто складіть долоні — ритуал працює і без нього).',
+      'Тримайте камеру так, щоб долоня була у кадрі повністю.',
+      'Робіть повільні кругові рухи долонею — так, ніби розтираєте крем.',
+      'Дихайте рівно. Ми порахуємо кола за вас.'
+    ],
+    privacy: 'Браузер запитає дозвіл на камеру. Відео обробляється локально, нічого не завантажується на сервер.'
+  },
+  face: {
+    eyebrow: 'Ритуал для обличчя',
+    title: 'Масаж обличчя пальцями',
+    ritualLabel: 'Обличчя',
+    ritualCue: '',
+    steps: [
+      'Поставте телефон стійко — сперте об щось або на підставку. Обидві руки будуть зайняті.',
+      'Візьміть свій звичний засіб — олію, крем або сироватку. Пальці мають ковзати, а не тягнути шкіру.',
+      'Масажуйте подушечками пальців, дуже легко: тиск не сильніший, ніж коли розгладжуєте повіку.',
+      'Сядьте так, щоб обличчя було в кадрі повністю, і приберіть волосся з лоба.',
+      'Три зони по 15 секунд: лоб, щоки, щелепа й шия. Почнете, коли будете готові.'
+    ],
+    note: 'Засоби DIPSY для обличчя ще готуються — поки скористайтесь тим, що вже маєте.',
+    privacy: 'Друга частина використовує камеру, щоб бачити ваше обличчя. Відео обробляється у вашому браузері й нікуди не надсилається — нічого не записується.'
+  }
+};
+
+function renderPrep(){
+  const copy = PREP_COPY[ritualType];
+  $('#p-eyebrow').textContent = copy.eyebrow;
+  $('#p-title').textContent = ritualType === 'hand' ? chosen.ritual : copy.title;
+  $('#p-steps').innerHTML = copy.steps.map(s => `<li>${s}</li>`).join('');
+  const noteEl = $('#p-note');
+  if (copy.note){
+    noteEl.textContent = copy.note;
+    noteEl.hidden = false;
+  } else {
+    noteEl.hidden = true;
+  }
+  $('#p-privacy').textContent = copy.privacy;
+}
+
 function finishQuiz(){
   chosen = PRODUCTS[scoreQuiz()];
   $('#r-title').textContent   = chosen.title;
@@ -430,8 +573,6 @@ function finishQuiz(){
   $('#r-scent').textContent   = chosen.scent;
   $('#r-link').href           = chosen.url;
   $('#p-title').textContent   = chosen.ritual;
-  $('#rit-name').textContent  = chosen.ritual;
-  $('#rit-cue').textContent   = chosen.cue;
   show('s-result');
 }
 
@@ -447,7 +588,16 @@ $('#q-back').addEventListener('click', ()=>{
   renderQuestion();
 });
 
-$('#go-ritual').addEventListener('click', ()=> show('s-prep'));
+$('#go-ritual-hand').addEventListener('click', ()=>{
+  ritualType = 'hand';
+  renderPrep();
+  show('s-prep');
+});
+$('#go-ritual-face').addEventListener('click', ()=>{
+  ritualType = 'face';
+  renderPrep();
+  show('s-prep');
+});
 
 /* =================================================================
    ДЕТЕКТОР КРУГОВИХ РУХІВ
@@ -547,6 +697,7 @@ class CircleCounter {
    ================================================================= */
 const video   = $('#video');
 const overlay = $('#overlay');
+const stage   = $('.stage');
 const ctx     = overlay.getContext('2d');
 const msgBox  = $('#stage-msg');
 
@@ -554,6 +705,14 @@ let handLandmarker = null;
 let stream = null;
 let rafId = null;
 let lastVideoTime = -1;
+let faceLandmarker = null;
+let faceStream = null;
+let faceRafId = null;
+let faceLastVideoTime = -1;
+let faceZoneIndex = 0;
+let faceZoneElapsedMs = 0;
+let faceZoneLastTick = null;
+let faceReady = false;
 const counter = new CircleCounter();
 
 const RING_LEN = 125.66;
@@ -561,6 +720,17 @@ function setRing(p){ $('#ring-fg').style.strokeDashoffset = String(RING_LEN * (1
 function setMsg(text){
   if (text === null){ msgBox.hidden = true; }
   else { msgBox.textContent = text; msgBox.hidden = false; }
+}
+
+function resetRitualStage(){
+  $('#rep-count').textContent = '0';
+  setRing(0);
+  ctx.clearRect(0, 0, overlay.width || 0, overlay.height || 0);
+  $('#rit-hint').textContent = '';
+}
+
+function applyStageMode(){
+  stage.classList.toggle('stage--face', ritualType === 'face');
 }
 
 async function loadModel(){
@@ -580,7 +750,359 @@ async function loadModel(){
   return handLandmarker;
 }
 
+async function loadFaceModel(){
+  if (faceLandmarker) return faceLandmarker;
+  const { FilesetResolver, FaceLandmarker } =
+    await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs');
+  const vision = await FilesetResolver.forVisionTasks(
+    'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm');
+  faceLandmarker = await FaceLandmarker.createFromOptions(vision, {
+    baseOptions:{
+      modelAssetPath:'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task',
+      delegate:'GPU'
+    },
+    runningMode:'VIDEO',
+    numFaces:1,
+    outputFacialTransformationMatrixes:true,
+    outputFaceBlendshapes:false
+  });
+  return faceLandmarker;
+}
+
+/* =================================================================
+   ОБЛИЧЧЯ — детекція присутності, світла, повороту голови
+   Пороги нижче — перший прохід, підлаштовувати на живій камері.
+   ================================================================= */
+const FACE_LOST_MS = 550;
+const FACE_LUMINANCE_THRESHOLD = 80;   // 0–255, adjusted 11 Aug — real test showed 76 still looked visibly dim
+const FACE_YAW_RATIO_THRESHOLD = 0.35; // min/max distances nose–eyes, adjusted 11 Aug — see note below
+const FACE_LIGHT_CHECK_MS = 200;
+
+const lightCanvas = document.createElement('canvas');
+lightCanvas.width = 16;
+lightCanvas.height = 16;
+const lightCtx = lightCanvas.getContext('2d', { willReadFrequently:true });
+
+let faceAbsentSince = null;
+let headTurnedSince = null;
+const HEAD_TURN_HOLD_MS = 400; // мусить тримати поворот стільки, перш ніж показати підказку
+let lastLightCheckAt = 0;
+let lastLuminance = 255;
+
+function measureLuminance(){
+  lightCtx.drawImage(video, 0, 0, 16, 16);
+  const data = lightCtx.getImageData(0, 0, 16, 16).data;
+  let sum = 0;
+  for (let i = 0; i < data.length; i += 4){
+    sum += 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+  }
+  return sum / (data.length / 4);
+}
+
+function yawRatio(lm){
+  const nose = lm[1];
+  const leftOuter = lm[33];
+  const rightOuter = lm[263];
+  if (!nose || !leftOuter || !rightOuter) return null;
+  const dLeft = Math.abs(nose.x - leftOuter.x);
+  const dRight = Math.abs(nose.x - rightOuter.x);
+  return Math.min(dLeft, dRight) / (Math.max(dLeft, dRight) || 0.001);
+}
+
+function isHeadTurned(lm){
+  const ratio = yawRatio(lm);
+  return ratio !== null && ratio < FACE_YAW_RATIO_THRESHOLD;
+}
+
+function drawArrowhead(from, to){
+  const angle = Math.atan2(to.y - from.y, to.x - from.x);
+  const size = 7;
+  ctx.fillStyle = 'rgba(244,237,231,.9)';
+  ctx.beginPath();
+  ctx.moveTo(to.x, to.y);
+  ctx.lineTo(to.x - size * Math.cos(angle - 0.45), to.y - size * Math.sin(angle - 0.45));
+  ctx.lineTo(to.x - size * Math.cos(angle + 0.45), to.y - size * Math.sin(angle + 0.45));
+  ctx.closePath();
+  ctx.fill();
+}
+
+function strokeSmoothPath(points){
+  ctx.beginPath();
+  ctx.moveTo(points[0].x, points[0].y);
+  if (points.length === 2){
+    ctx.lineTo(points[1].x, points[1].y);
+    return;
+  }
+  for (let i = 1; i < points.length - 2; i++){
+    const midX = (points[i].x + points[i + 1].x) / 2;
+    const midY = (points[i].y + points[i + 1].y) / 2;
+    ctx.quadraticCurveTo(points[i].x, points[i].y, midX, midY);
+  }
+  const last = points[points.length - 1];
+  const prev = points[points.length - 2];
+  ctx.quadraticCurveTo(prev.x, prev.y, last.x, last.y);
+}
+
+function applyGuideStrokeStyle(elapsedMs, opacityScale){
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  ctx.lineWidth = 1.5;
+  const pulse = 0.72 + 0.18 * Math.sin(elapsedMs / 420);
+  ctx.strokeStyle = `rgba(244,237,231,${(pulse * opacityScale).toFixed(2)})`;
+}
+
+function drawZoneStroke(lm, indices, elapsedMs, extrapolate){
+  const W = overlay.width, H = overlay.height;
+  const points = indices.map(i => ({ x: lm[i].x * W, y: lm[i].y * H }));
+  if (points.length < 2) return;
+
+  applyGuideStrokeStyle(elapsedMs, 1);
+  strokeSmoothPath(points);
+  ctx.stroke();
+
+  function extrapolateFrom(p0, p1){
+    const dx = p1.x - p0.x, dy = p1.y - p0.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const extLen = len * 1.4;
+    return { x: p1.x + (dx / len) * extLen, y: p1.y + (dy / len) * extLen };
+  }
+
+  const doEnd = extrapolate === 'end' || extrapolate === 'both' || extrapolate === true;
+  const doStart = extrapolate === 'start' || extrapolate === 'both';
+
+  const last = points[points.length - 1];
+  const prev = points[points.length - 2];
+  if (doEnd){
+    const extEnd = extrapolateFrom(prev, last);
+    applyGuideStrokeStyle(elapsedMs, 0.5);
+    ctx.lineCap = 'butt';
+    ctx.beginPath();
+    ctx.moveTo(last.x, last.y);
+    ctx.lineTo(extEnd.x, extEnd.y);
+    ctx.stroke();
+    drawArrowhead(last, extEnd);
+  } else {
+    drawArrowhead(prev, last);
+  }
+
+  if (doStart){
+    const first = points[0];
+    const second = points[1];
+    const extStart = extrapolateFrom(second, first);
+    applyGuideStrokeStyle(elapsedMs, 0.5);
+    ctx.lineCap = 'butt';
+    ctx.beginPath();
+    ctx.moveTo(first.x, first.y);
+    ctx.lineTo(extStart.x, extStart.y);
+    ctx.stroke();
+    drawArrowhead(first, extStart);
+  }
+}
+
+function drawZoneGuide(lm, zone, elapsedMs){
+  for (const stroke of zone.strokes){
+    drawZoneStroke(lm, stroke, elapsedMs, zone.extrapolate);
+  }
+}
+
+// Режим калібрування: ?debugLandmarks=1 — усі точки mesh з індексами
+function drawDebugLandmarks(lm){
+  const W = overlay.width, H = overlay.height;
+  ctx.font = '9px sans-serif';
+  lm.forEach((p, i) => {
+    const x = p.x * W, y = p.y * H;
+    ctx.fillStyle = 'rgba(244,237,231,.85)';
+    ctx.beginPath();
+    ctx.arc(x, y, 3.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,.92)';
+    ctx.fillText(String(i), x + 4, y - 4);
+  });
+}
+
+function updateZoneLabel(){
+  const zone = MASSAGE_ZONES[faceZoneIndex];
+  if (!zone) return;
+  $('#rit-cue').textContent = zone.technique;
+  if (!faceReady){
+    $('#zone-label').textContent =
+      `Зона ${faceZoneIndex + 1} з ${MASSAGE_ZONES.length} · ${zone.label}`;
+    $('#zone-bar').hidden = true;
+    return;
+  }
+  $('#zone-bar').hidden = false;
+  const remaining = Math.max(0, Math.ceil((ZONE_DURATION_MS - faceZoneElapsedMs) / 1000));
+  $('#zone-label').textContent =
+    `Зона ${faceZoneIndex + 1} з ${MASSAGE_ZONES.length} · ${zone.label} · ще ${remaining} с`;
+  $('#zone-bar-fill').style.width =
+    Math.min(100, (faceZoneElapsedMs / ZONE_DURATION_MS) * 100) + '%';
+}
+
+function finishFaceRitual(){
+  stopFaceCamera();
+  stopRitualAudio();
+  finish('3 зони, крок за кроком — легкий рух, без поспіху.', FACE_BRIDGE);
+}
+
+function stopFaceCamera(){
+  if (faceRafId) cancelAnimationFrame(faceRafId);
+  faceRafId = null;
+  if (faceStream){ faceStream.getTracks().forEach(t => t.stop()); faceStream = null; }
+  video.srcObject = null;
+  faceLastVideoTime = -1;
+  faceAbsentSince = null;
+}
+
+function faceLoop(){
+  faceRafId = requestAnimationFrame(faceLoop);
+  if (!faceLandmarker || video.readyState < 2) return;
+  if (video.currentTime === faceLastVideoTime) return;
+  faceLastVideoTime = video.currentTime;
+
+  if (overlay.width !== video.videoWidth){
+    overlay.width  = video.videoWidth;
+    overlay.height = video.videoHeight;
+  }
+
+  const res = faceLandmarker.detectForVideo(video, performance.now());
+  ctx.clearRect(0, 0, overlay.width, overlay.height);
+
+  const now = performance.now();
+  const hasFace = res.faceLandmarks && res.faceLandmarks.length > 0;
+
+  if (!hasFace){
+    faceZoneLastTick = null;
+    $('#face-ready').hidden = true;
+    if (faceAbsentSince === null) faceAbsentSince = now;
+    if (now - faceAbsentSince >= FACE_LOST_MS){
+      setMsg('Не бачимо обличчя в кадрі. Наблизьтесь або поправте кут камери.');
+      $('#rit-hint').textContent = '';
+    }
+    return;
+  }
+
+  faceAbsentSince = null;
+  setMsg(null);
+
+  const lm = res.faceLandmarks[0];
+  let hint = '';
+
+  if (now - lastLightCheckAt >= FACE_LIGHT_CHECK_MS){
+    lastLightCheckAt = now;
+    lastLuminance = measureLuminance();
+  }
+  if (lastLuminance < FACE_LUMINANCE_THRESHOLD){
+    hint = 'Спробуйте більше світла — так камері легше вас бачити.';
+  } else if (isHeadTurned(lm)){
+    if (headTurnedSince === null) headTurnedSince = now;
+    if (now - headTurnedSince >= HEAD_TURN_HOLD_MS){
+      hint = 'Поверніться прямо до камери.';
+    }
+  } else {
+    headTurnedSince = null;
+  }
+
+  if (DEBUG_FACE_SIGNALS){
+    const yr = yawRatio(lm);
+    const debugText = `світло: ${lastLuminance.toFixed(0)} (поріг ${FACE_LUMINANCE_THRESHOLD}) · нахил: ${yr === null ? '—' : yr.toFixed(2)} (поріг ${FACE_YAW_RATIO_THRESHOLD})`;
+    hint = hint ? hint + ' · ' + debugText : debugText;
+  }
+
+  $('#rit-hint').textContent = hint;
+
+  if (!faceReady){
+    $('#face-ready').hidden = false;
+    faceZoneLastTick = null;
+    updateZoneLabel();
+    if (DEBUG_LANDMARKS) drawDebugLandmarks(lm);
+    else drawZoneGuide(lm, MASSAGE_ZONES[faceZoneIndex], now);
+    return;
+  }
+
+  $('#face-ready').hidden = true;
+
+  if (faceZoneLastTick === null) faceZoneLastTick = now;
+  else {
+    faceZoneElapsedMs += now - faceZoneLastTick;
+    faceZoneLastTick = now;
+  }
+
+  if (faceZoneElapsedMs >= ZONE_DURATION_MS){
+    faceZoneIndex++;
+    faceZoneElapsedMs = 0;
+    if (faceZoneIndex >= MASSAGE_ZONES.length){
+      finishFaceRitual();
+      return;
+    }
+  }
+
+  updateZoneLabel();
+
+  if (DEBUG_LANDMARKS) drawDebugLandmarks(lm);
+  else drawZoneGuide(lm, MASSAGE_ZONES[faceZoneIndex], faceZoneElapsedMs);
+}
+
+async function startFaceRitual(){
+  resetRitualStage();
+  applyStageMode();
+  $('#rit-name').textContent = PREP_COPY.face.ritualLabel;
+  $('#rit-cue').textContent  = PREP_COPY.face.ritualCue;
+  show('s-ritual');
+  faceAbsentSince = null;
+  lastLightCheckAt = 0;
+  lastLuminance = 255;
+  faceLastVideoTime = -1;
+  faceZoneIndex = 0;
+  faceZoneElapsedMs = 0;
+  faceZoneLastTick = null;
+  faceReady = false;
+  $('#face-ready').hidden = true;
+  $('#zone-label').hidden = false;
+  $('#zone-bar').hidden = true;
+  $('#zone-bar-fill').style.width = '0%';
+  updateZoneLabel();
+  setMsg('Готуємо камеру…');
+
+  try {
+    faceStream = await navigator.mediaDevices.getUserMedia({
+      video:{ facingMode:'user', width:{ideal:640}, height:{ideal:480} },
+      audio:false
+    });
+  } catch(err){
+    setMsg('Не вдалося отримати доступ до камери. Можна пройти ритуал без неї — натисніть «Завершити раніше» і оберіть варіант без камери.');
+    return;
+  }
+
+  video.srcObject = faceStream;
+  await video.play().catch(()=>{});
+
+  setMsg('Завантажуємо модель…');
+  try {
+    await loadFaceModel();
+  } catch(err){
+    setMsg('Не вдалося завантажити модель розпізнавання. Перевірте зʼєднання з інтернетом.');
+    return;
+  }
+
+  setMsg(null);
+  $('#rit-hint').textContent = '';
+  faceLoop();
+  playRitualAudio();
+}
+
+$('#face-ready-go').addEventListener('click', ()=>{
+  faceReady = true;
+  $('#face-ready').hidden = true;
+  faceZoneLastTick = null;
+});
+
 async function startRitual(){
+  resetRitualStage();
+  applyStageMode();
+  $('#zone-label').hidden = true;
+  $('#zone-bar').hidden = true;
+  $('#rit-name').textContent = chosen.ritual;
+  $('#rit-cue').textContent  = chosen.cue;
   show('s-ritual');
   counter.reset();
   $('#rep-goal').textContent = REP_GOAL;
@@ -612,6 +1134,7 @@ async function startRitual(){
   setMsg(null);
   $('#rit-hint').textContent = 'Покажіть долоню в кадрі';
   loop();
+  playRitualAudio();
 }
 
 function loop(){
@@ -693,13 +1216,24 @@ function stopCamera(){
 
 function completeRitual(reps){
   stopCamera();
+  stopRitualAudio();
   finish(`${reps} кіл, повільно й уважно. Шкіра встигла все ввібрати.`);
 }
 
-$('#start-cam').addEventListener('click', startRitual);
+$('#start-cam').addEventListener('click', ()=>{
+  if (ritualType === 'face') startFaceRitual();
+  else startRitual();
+});
 $('#quit-ritual').addEventListener('click', ()=>{
+  if (ritualType === 'face'){
+    stopFaceCamera();
+    stopRitualAudio();
+    finish(`Встигли пройти ${faceZoneIndex + 1} з ${MASSAGE_ZONES.length} зон — і це вже частина ритуалу.`, FACE_BRIDGE);
+    return;
+  }
   const reps = counter.reps;
   stopCamera();
+  stopRitualAudio();
   finish(reps > 0
     ? `${reps} кіл. Навіть коротка пауза рахується.`
     : 'Пауза теж рахується.');
@@ -713,6 +1247,7 @@ $('#skip-cam').addEventListener('click', ()=>{
   let left = BREATHE_SECONDS;
   $('#breathe-left').textContent = left;
   show('s-breathe');
+  playRitualAudio();
   const phase = ['Вдих','Затримка','Видих','Пауза'];
   let pi = 0;
   $('#breathe-text').textContent = phase[0];
@@ -723,37 +1258,53 @@ $('#skip-cam').addEventListener('click', ()=>{
     if (left % 3 === 0){ pi = (pi + 1) % phase.length; $('#breathe-text').textContent = phase[pi]; }
     if (left <= 0){
       clearInterval(breatheTimer);
+      stopRitualAudio();
       finish('Хвилина усвідомленого дихання. Це вже ритуал.');
     }
   }, 1000);
 });
 $('#quit-breathe').addEventListener('click', ()=>{
   clearInterval(breatheTimer);
+  stopRitualAudio();
   finish('Пауза теж рахується.');
 });
 
 /* =================================================================
    ФІНАЛ
    ================================================================= */
-function finish(summary){
+function finish(summary, productOverride){
   $('#f-summary').textContent = summary;
-  $('#f-product').textContent = chosen ? chosen.product : '';
-  $('#f-why').textContent     = chosen ? chosen.why : '';
-  $('#f-link').href           = chosen ? chosen.url : 'https://dipsybydv.com.ua/';
+  const p = productOverride || chosen;
+  $('#f-kicker').textContent  = productOverride ? 'Поки готується лінійка для обличчя' : 'Підібрано для вас';
+  $('#f-product').textContent = p ? p.title || p.product : '';
+  $('#f-why').textContent     = p ? p.why : '';
+  $('#f-link').href           = p ? p.url : 'https://dipsybydv.com.ua/';
   show('s-final');
 }
 
 $('#restart').addEventListener('click', ()=>{
   stopCamera();
+  stopFaceCamera();
   clearInterval(breatheTimer);
+  stopRitualAudio();
   counter.reset();
-  qIndex = 0; answers = []; chosen = null;
+  faceZoneIndex = 0;
+  faceZoneElapsedMs = 0;
+  faceZoneLastTick = null;
+  faceReady = false;
+  $('#face-ready').hidden = true;
+  $('#zone-label').hidden = true;
+  $('#zone-bar').hidden = true;
+  qIndex = 0; answers = []; chosen = null; ritualType = null;
   show('s-intro');
 });
 
 // не тримаємо камеру увімкненою, якщо вкладку сховали
 document.addEventListener('visibilitychange', ()=>{
-  if (document.hidden && stream) stopCamera();
+  if (!document.hidden) return;
+  if (stream) stopCamera();
+  if (faceStream) stopFaceCamera();
+  stopRitualAudio();
 });
 </script>
 </body>
