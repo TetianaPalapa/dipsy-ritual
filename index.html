@@ -109,6 +109,7 @@
     transition:border-color .2s,background .2s,transform .12s;
   }
   .option:active{transform:scale(.99)}
+  .option.selected{border-color:var(--wine);background:var(--sand)}
   .option:focus-visible{outline:2px solid var(--wine);outline-offset:2px}
 
   /* ---------- результат ---------- */
@@ -490,21 +491,31 @@ function renderQuestion(){
     b.className = 'option';
     b.type = 'button';
     b.textContent = opt.t;
-    b.addEventListener('click', ()=> answer(i));
+    b.addEventListener('click', ()=> answer(i, b));
     $('#q-options').appendChild(b);
   });
   $('#q-back').textContent = qIndex === 0 ? 'На початок' : 'Назад';
 }
 
-function answer(i){
+let answering = false;
+function answer(i, btnEl){
+  if (answering) return; // захист від подвійного тапу під час паузи
+  answering = true;
   if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
   answers[qIndex] = i;
-  if (qIndex < QUIZ.length - 1){
-    qIndex++;
-    renderQuestion();
-  } else {
-    finishQuiz();
-  }
+
+  document.querySelectorAll('#q-options .option').forEach(el => el.disabled = true);
+  if (btnEl) btnEl.classList.add('selected');
+
+  setTimeout(()=>{
+    answering = false;
+    if (qIndex < QUIZ.length - 1){
+      qIndex++;
+      renderQuestion();
+    } else {
+      finishQuiz();
+    }
+  }, 380);
 }
 
 function scoreQuiz(){
