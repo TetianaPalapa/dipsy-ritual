@@ -402,7 +402,7 @@ const MASSAGE_ZONES = [
   {
     id: 'temples',
     label: 'Скроні',
-    technique: 'Легкі кругові рухи подушечками пальців на скронях',
+    technique: 'Подушечками пальців — легкий ковзний рух до скроні',
     strokes: [
       [127, 227],
       [356, 447]
@@ -413,8 +413,8 @@ const MASSAGE_ZONES = [
     label: 'Під очима',
     technique: 'Безіменним пальцем, дуже легко — від внутрішнього кута ока до скроні',
     strokes: [
-      [133, 111, 117, 234],
-      [362, 340, 346, 454]
+      [133, 145, 33, 234],
+      [362, 374, 263, 454]
     ]
   },
   {
@@ -433,7 +433,9 @@ const MASSAGE_ZONES = [
     strokes: [
       [172, 136, 152, 365, 397]
     ],
-    extrapolate: 'both'
+    extrapolate: 'both',
+    symmetricFrom: 2,
+    neckDrop: true
   }
 ];
 // Індекси зон 'temples' і 'undereye' — перше наближення, не перевірене наживо.
@@ -874,6 +876,35 @@ function strokeSmoothPath(points){
   ctx.quadraticCurveTo(prev.x, prev.y, last.x, last.y);
 }
 
+function quadPoint(p0, cp, p1, t){
+  const mt = 1 - t;
+  return {
+    x: mt * mt * p0.x + 2 * mt * t * cp.x + t * t * p1.x,
+    y: mt * mt * p0.y + 2 * mt * t * cp.y + t * t * p1.y
+  };
+}
+
+function sampleSmoothPath(points, stepsPerSeg){
+  stepsPerSeg = stepsPerSeg || 8;
+  if (points.length < 2) return points.slice();
+  if (points.length === 2) return [points[0], points[1]];
+  const sampled = [points[0]];
+  let prevPoint = points[0];
+  for (let i = 1; i < points.length - 2; i++){
+    const cp = points[i];
+    const endPoint = {
+      x: (points[i].x + points[i + 1].x) / 2,
+      y: (points[i].y + points[i + 1].y) / 2
+    };
+    for (let s = 1; s <= stepsPerSeg; s++) sampled.push(quadPoint(prevPoint, cp, endPoint, s / stepsPerSeg));
+    prevPoint = endPoint;
+  }
+  const last = points[points.length - 1];
+  const prevCtrl = points[points.length - 2];
+  for (let s = 1; s <= stepsPerSeg; s++) sampled.push(quadPoint(prevPoint, prevCtrl, last, s / stepsPerSeg));
+  return sampled;
+}
+
 function applyGuideStrokeStyle(elapsedMs, opacityScale){
   ctx.lineJoin = 'round';
   ctx.lineCap = 'round';
@@ -882,7 +913,7 @@ function applyGuideStrokeStyle(elapsedMs, opacityScale){
   ctx.strokeStyle = `rgba(244,237,231,${(pulse * opacityScale).toFixed(2)})`;
 }
 
-const ZONE_TRAVEL_MS = 1800; // час проходження світної точки від початку лінії до кінця
+const ZONE_TRAVEL_MS = 1800;
 
 function pointAlongPath(points, t){
   const segLens = [];
@@ -908,18 +939,18 @@ function pointAlongPath(points, t){
 }
 
 function drawTravelDot(x, y, elapsedMs){
-  const pulse = 0.75 + 0.25 * Math.sin(elapsedMs / 200);
+  const pulse = 0.65 + 0.2 * Math.sin(elapsedMs / 200);
   ctx.save();
-  ctx.shadowColor = 'rgba(244,237,231,0.95)';
-  ctx.shadowBlur = 10;
+  ctx.shadowColor = 'rgba(244,237,231,0.9)';
+  ctx.shadowBlur = 6;
   ctx.fillStyle = `rgba(244,237,231,${pulse.toFixed(2)})`;
   ctx.beginPath();
-  ctx.arc(x, y, 4.5, 0, Math.PI * 2);
+  ctx.arc(x, y, 3, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
 }
 
-function drawZoneStroke(lm, indices, elapsedMs, extrapolate){
+function drawZoneStroke(lm, indices, elapsedMs, extrapolate, symmetricFrom, neckDrop){
   const W = overlay.width, H = overlay.height;
   const points = indices.map(i => ({ x: lm[i].x * W, y: lm[i].y * H }));
   if (points.length < 2) return;
@@ -929,14 +960,34 @@ function drawZoneStroke(lm, indices, elapsedMs, extrapolate){
   ctx.stroke();
 
   const travelT = (elapsedMs % ZONE_TRAVEL_MS) / ZONE_TRAVEL_MS;
-  const dotPos = pointAlongPath(points, travelT);
-  drawTravelDot(dotPos.x, dotPos.y, elapsedMs);
+  if (typeof symmetricFrom === 'number' && points[symmetricFrom]){
+    const leftPts = points.slice(0, symmetricFrom + 1).slice().reverse();
+    const rightPts = points.slice(symmetricFrom);
+    if (leftPts.length >= 2){
+      const p = pointAlongPath(sampleSmoothPath(leftPts), travelT);
+      drawTravelDot(p.x, p.y, elapsedMs);
+    }
+    if (rightPts.length >= 2){
+      const p = pointAlongPath(sampleSmoothPath(rightPts), travelT);
+      drawTravelDot(p.x, p.y, elapsedMs);
+    }
+  } else {
+    const p = pointAlongPath(sampleSmoothPath(points), travelT);
+    drawTravelDot(p.x, p.y, elapsedMs);
+  }
 
   function extrapolateFrom(p0, p1){
     const dx = p1.x - p0.x, dy = p1.y - p0.y;
     const len = Math.hypot(dx, dy) || 1;
+    let dirX = dx / len, dirY = dy / len;
+    if (neckDrop){
+      dirX *= 0.4;
+      dirY = dirY * 0.4 + 0.9;
+      const norm = Math.hypot(dirX, dirY) || 1;
+      dirX /= norm; dirY /= norm;
+    }
     const extLen = len * 1.4;
-    return { x: p1.x + (dx / len) * extLen, y: p1.y + (dy / len) * extLen };
+    return { x: p1.x + dirX * extLen, y: p1.y + dirY * extLen };
   }
 
   const doEnd = extrapolate === 'end' || extrapolate === 'both' || extrapolate === true;
@@ -973,7 +1024,7 @@ function drawZoneStroke(lm, indices, elapsedMs, extrapolate){
 
 function drawZoneGuide(lm, zone, elapsedMs){
   for (const stroke of zone.strokes){
-    drawZoneStroke(lm, stroke, elapsedMs, zone.extrapolate);
+    drawZoneStroke(lm, stroke, elapsedMs, zone.extrapolate, zone.symmetricFrom, zone.neckDrop);
   }
 }
 
