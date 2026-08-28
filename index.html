@@ -392,7 +392,7 @@ const ZONE_DURATION_MS = 15000; // тривалість однієї зони, �
 const MASSAGE_ZONES = [
   {
     id: 'forehead',
-    label: 'Лоб → скроні',
+    label: 'Лоб і міжбрів\'я',
     technique: 'Подушечками двох пальців, легко — від центру до скронь',
     strokes: [
       [9, 107, 68, 127],
@@ -400,9 +400,27 @@ const MASSAGE_ZONES = [
     ]
   },
   {
+    id: 'temples',
+    label: 'Скроні',
+    technique: 'Легкі кругові рухи подушечками пальців на скронях',
+    strokes: [
+      [127, 227],
+      [356, 447]
+    ]
+  },
+  {
+    id: 'undereye',
+    label: 'Під очима',
+    technique: 'Безіменним пальцем, дуже легко — від внутрішнього кута ока до скроні',
+    strokes: [
+      [133, 111, 117, 234],
+      [362, 340, 346, 454]
+    ]
+  },
+  {
     id: 'cheeks',
-    label: 'Щоки: ніс → вуха',
-    technique: 'Подушечками пальців, ковзний рух — від носа до вух',
+    label: 'Щоки й вилиці',
+    technique: 'Подушечками пальців, ковзний рух — від носа вгору до вух',
     strokes: [
       [98, 50, 234],
       [327, 280, 454]
@@ -418,6 +436,8 @@ const MASSAGE_ZONES = [
     extrapolate: 'both'
   }
 ];
+// Індекси зон 'temples' і 'undereye' — перше наближення, не перевірене наживо.
+// Обов'язково звірити через ?debugLandmarks=1 на реальному обличчі перед фінальним тестом.
 const DEBUG_LANDMARKS = new URLSearchParams(location.search).get('debugLandmarks') === '1';
 const DEBUG_FACE_SIGNALS = new URLSearchParams(location.search).get('debugFace') === '1';
 
@@ -550,10 +570,10 @@ const PREP_COPY = {
     ritualCue: '',
     steps: [
       'Поставте телефон стійко — сперте об щось або на підставку. Обидві руки будуть зайняті.',
-      'Візьміть свій звичний засіб — олію, крем або сироватку. Пальці мають ковзати, а не тягнути шкіру.',
+      'Нанесіть засіб по всьому обличчю — лоб, обидві щоки, ніс, підборіддя — і лише тоді починайте рух. Пальці мають ковзати, а не тягнути шкіру.',
       'Масажуйте подушечками пальців, дуже легко: тиск не сильніший, ніж коли розгладжуєте повіку.',
       'Сядьте так, щоб обличчя було в кадрі повністю, і приберіть волосся з лоба.',
-      'Три зони по 15 секунд: лоб, щоки, щелепа й шия. Почнете, коли будете готові.'
+      'Пʼять зон по 15 секунд: лоб, скроні, під очима, щоки, щелепа й шия. Почнете, коли будете готові.'
     ],
     note: 'Засоби DIPSY для обличчя ще готуються — поки скористайтесь тим, що вже маєте.',
     privacy: 'Друга частина використовує камеру, щоб бачити ваше обличчя. Відео обробляється у вашому браузері й нікуди не надсилається — нічого не записується.'
@@ -862,6 +882,43 @@ function applyGuideStrokeStyle(elapsedMs, opacityScale){
   ctx.strokeStyle = `rgba(244,237,231,${(pulse * opacityScale).toFixed(2)})`;
 }
 
+const ZONE_TRAVEL_MS = 1800; // час проходження світної точки від початку лінії до кінця
+
+function pointAlongPath(points, t){
+  const segLens = [];
+  let total = 0;
+  for (let i = 0; i < points.length - 1; i++){
+    const d = Math.hypot(points[i + 1].x - points[i].x, points[i + 1].y - points[i].y);
+    segLens.push(d);
+    total += d;
+  }
+  if (total === 0) return points[0];
+  let dist = t * total;
+  for (let i = 0; i < segLens.length; i++){
+    if (dist <= segLens[i] || i === segLens.length - 1){
+      const segT = segLens[i] === 0 ? 0 : Math.min(1, dist / segLens[i]);
+      return {
+        x: points[i].x + (points[i + 1].x - points[i].x) * segT,
+        y: points[i].y + (points[i + 1].y - points[i].y) * segT
+      };
+    }
+    dist -= segLens[i];
+  }
+  return points[points.length - 1];
+}
+
+function drawTravelDot(x, y, elapsedMs){
+  const pulse = 0.75 + 0.25 * Math.sin(elapsedMs / 200);
+  ctx.save();
+  ctx.shadowColor = 'rgba(244,237,231,0.95)';
+  ctx.shadowBlur = 10;
+  ctx.fillStyle = `rgba(244,237,231,${pulse.toFixed(2)})`;
+  ctx.beginPath();
+  ctx.arc(x, y, 4.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
 function drawZoneStroke(lm, indices, elapsedMs, extrapolate){
   const W = overlay.width, H = overlay.height;
   const points = indices.map(i => ({ x: lm[i].x * W, y: lm[i].y * H }));
@@ -870,6 +927,10 @@ function drawZoneStroke(lm, indices, elapsedMs, extrapolate){
   applyGuideStrokeStyle(elapsedMs, 1);
   strokeSmoothPath(points);
   ctx.stroke();
+
+  const travelT = (elapsedMs % ZONE_TRAVEL_MS) / ZONE_TRAVEL_MS;
+  const dotPos = pointAlongPath(points, travelT);
+  drawTravelDot(dotPos.x, dotPos.y, elapsedMs);
 
   function extrapolateFrom(p0, p1){
     const dx = p1.x - p0.x, dy = p1.y - p0.y;
