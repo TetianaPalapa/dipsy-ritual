@@ -76,7 +76,7 @@
     transition:transform .15s ease,background .2s ease;
     text-align:center;text-decoration:none;
   }
-  .btn:hover{background:var(--wine-soft)}
+  @media (hover: hover){ .btn:hover{background:var(--wine-soft)} }
   .btn:active{transform:scale(.985)}
   .btn:focus-visible{outline:2px solid var(--wine);outline-offset:3px}
   .btn.ghost{background:transparent;color:var(--muted);border:1px solid var(--line);margin-top:10px}
@@ -108,7 +108,6 @@
     font-family:var(--font-ui);font-size:15px;color:var(--ink);
     transition:border-color .2s,background .2s,transform .12s;
   }
-  .option:hover{border-color:var(--wine-soft);background:var(--sand)}
   .option:active{transform:scale(.99)}
   .option:focus-visible{outline:2px solid var(--wine);outline-offset:2px}
 
@@ -248,7 +247,7 @@
       </div>
       <div class="hud">
         <div class="count"><span id="rep-count">0</span><small> / <span id="rep-goal">8</span> кіл</small></div>
-        <div class="hint" id="rit-hint">Покажіть долоню в кадрі</div>
+        <div class="hint" id="rit-hint">Покажіть кисть руки в кадрі</div>
         <button class="sound-toggle" id="sound-toggle-ritual" type="button" aria-label="Керування звуком">♪</button>
       </div>
     </div>
@@ -498,6 +497,7 @@ function renderQuestion(){
 }
 
 function answer(i){
+  if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
   answers[qIndex] = i;
   if (qIndex < QUIZ.length - 1){
     qIndex++;
@@ -525,9 +525,9 @@ const PREP_COPY = {
     // ritualLabel / ritualCue — з chosen.ritual / chosen.cue під час старту
     steps: [
       'Поставте телефон стійко — сперте об щось або на підставку. Обидві руки будуть зайняті.',
-      'Візьміть трохи засобу (або просто складіть долоні — ритуал працює і без нього).',
-      'Тримайте камеру так, щоб долоня була у кадрі повністю.',
-      'Робіть повільні кругові рухи долонею — так, ніби розтираєте крем.',
+      'Візьміть трохи засобу (або просто зігніть кисть, ніби тримаєте невеликий мʼяч — ритуал працює і без засобу).',
+      'Тримайте камеру так, щоб уся кисть руки була в кадрі — байдуже, долонею чи тильною стороною до камери.',
+      'Рухайте всією кистю по колу перед камерою — широкий рух у повітрі, а не легке розтирання на місці. На екрані зʼявиться орієнтир — ведіть рух за ним.',
       'Дихайте рівно. Ми порахуємо кола за вас.'
     ],
     privacy: 'Браузер запитає дозвіл на камеру. Відео обробляється локально, нічого не завантажується на сервер.'
@@ -615,7 +615,7 @@ $('#go-ritual-face').addEventListener('click', ()=>{
 class CircleCounter {
   constructor(opts = {}){
     this.windowMs      = opts.windowMs      ?? 1100; // довжина ковзного вікна
-    this.minRadiusRatio= opts.minRadiusRatio?? 0.22; // радіус як частка розміру долоні
+    this.minRadiusRatio= opts.minRadiusRatio?? 0.14; // радіус як частка розміру долоні — знижено 14 серпня, 0.22 виявився завеликим на живих тестах в обох положеннях руки
     this.maxStep       = opts.maxStep       ?? 0.9;  // рад/кадр, більше = збій трекінгу
     this.smoothing     = opts.smoothing     ?? 0.45; // EMA згладжування центру долоні
     this.reset();
@@ -1087,7 +1087,6 @@ async function startFaceRitual(){
   setMsg(null);
   $('#rit-hint').textContent = '';
   faceLoop();
-  playRitualAudio();
 }
 
 $('#face-ready-go').addEventListener('click', ()=>{
@@ -1132,9 +1131,8 @@ async function startRitual(){
   }
 
   setMsg(null);
-  $('#rit-hint').textContent = 'Покажіть долоню в кадрі';
+  $('#rit-hint').textContent = 'Покажіть кисть руки в кадрі';
   loop();
-  playRitualAudio();
 }
 
 function loop(){
@@ -1163,8 +1161,12 @@ function loop(){
     const palm = { x:(w.x + i5.x + i17.x)/3, y:(w.y + i5.y + i17.y)/3 };
     const handSize = Math.hypot(i9.x - w.x, i9.y - w.y) || 0.1;
 
-    out = counter.update(palm, handSize, performance.now());
-    drawHand(lm, out, aspect);
+    const now = performance.now();
+    out = counter.update(palm, handSize, now);
+
+    const palmPx = { x: (palm.x / aspect) * overlay.width, y: palm.y * overlay.height };
+    const targetRadiusPx = counter.minRadiusRatio * handSize * overlay.height * 1.3;
+    drawHand(lm, out, aspect, palmPx, targetRadiusPx, now);
   } else {
     out = counter.lost();
   }
@@ -1178,23 +1180,44 @@ function loop(){
 
 function hintFor(state){
   switch(state){
-    case 'lost':       return 'Долоня вийшла з кадру';
-    case 'too-small':  return 'Робіть ширші кругові рухи';
-    case 'collecting': return 'Починайте рухатись по колу';
+    case 'lost':       return 'Кисть вийшла з кадру';
+    case 'too-small':  return 'Ширше — ведіть кисть за орієнтиром на екрані';
+    case 'collecting': return 'Починайте рухатись по колу за орієнтиром';
     default:           return 'Добре. Тримайте темп';
   }
 }
 
-function drawHand(lm, out, aspect){
+const GUIDE_ROTATION_MS = 2200; // час на один умовний оберт орієнтира — темп, який задаємо людині
+
+function drawHandGuide(cxPx, cyPx, radiusPx, now){
+  ctx.strokeStyle = 'rgba(244,237,231,.35)';
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([5,6]);
+  ctx.beginPath();
+  ctx.arc(cxPx, cyPx, radiusPx, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  const angle = ((now % GUIDE_ROTATION_MS) / GUIDE_ROTATION_MS) * Math.PI * 2 - Math.PI / 2;
+  const dotX = cxPx + radiusPx * Math.cos(angle);
+  const dotY = cyPx + radiusPx * Math.sin(angle);
+  ctx.fillStyle = 'rgba(244,237,231,.9)';
+  ctx.beginPath();
+  ctx.arc(dotX, dotY, 5, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawHand(lm, out, aspect, palmPx, targetRadiusPx, now){
   const W = overlay.width, H = overlay.height;
-  // точки долоні
   ctx.fillStyle = 'rgba(244,237,231,.85)';
   for (const p of lm){
     ctx.beginPath();
     ctx.arc(p.x * W, p.y * H, 3.2, 0, Math.PI*2);
     ctx.fill();
   }
-  // коло, яке система бачить зараз
+
+  drawHandGuide(palmPx.x, palmPx.y, targetRadiusPx, now);
+
   if (out.state === 'tracking'){
     ctx.strokeStyle = 'rgba(244,237,231,.55)';
     ctx.lineWidth = 2;
@@ -1221,6 +1244,7 @@ function completeRitual(reps){
 }
 
 $('#start-cam').addEventListener('click', ()=>{
+  playRitualAudio(); // синхронно, в межах жесту користувача — інакше iOS Safari блокує звук
   if (ritualType === 'face') startFaceRitual();
   else startRitual();
 });
