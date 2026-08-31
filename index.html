@@ -392,54 +392,60 @@ const ZONE_DURATION_MS = 15000; // тривалість однієї зони, �
 const MASSAGE_ZONES = [
   {
     id: 'forehead',
-    label: 'Лоб і міжбрів\'я',
-    technique: 'Подушечками двох пальців, легко — від центру до скронь',
+    label: 'Лоб',
+    technique: 'Двома руками — від центру вгору до лінії волосся, далі в боки до скронь',
     strokes: [
-      [9, 107, 68, 127],
-      [9, 336, 298, 356]
+      [9, 10, 108, 69, 21],
+      [9, 10, 337, 299, 251]
     ]
   },
   {
-    id: 'temples',
-    label: 'Скроні',
-    technique: 'Подушечками пальців — легкий ковзний рух до скроні',
+    id: 'nose-undereye',
+    label: 'Ніс і під очима',
+    technique: 'Від крил носа обома руками — в боки та вгору повз ділянку під очима до скронь',
     strokes: [
-      [127, 227],
-      [356, 447]
-    ]
-  },
-  {
-    id: 'undereye',
-    label: 'Під очима',
-    technique: 'Безіменним пальцем, дуже легко — від внутрішнього кута ока до скроні',
-    strokes: [
-      [133, 145, 33, 234],
-      [362, 374, 263, 454]
+      [98, 205, 50, 234],
+      [327, 425, 280, 454]
     ]
   },
   {
     id: 'cheeks',
-    label: 'Щоки й вилиці',
-    technique: 'Подушечками пальців, ковзний рух — від носа вгору до вух',
+    label: 'Щоки',
+    technique: 'Від ділянки між губою й носом — в боки по щоках до середини вух',
     strokes: [
-      [98, 50, 234],
-      [327, 280, 454]
+      [164, 214, 187, 132],
+      [164, 434, 411, 361]
     ]
   },
   {
-    id: 'jaw',
-    label: 'Щелепа → шия',
-    technique: 'Подушечками пальців — від підборіддя вздовж щелепи до вуха й донизу',
+    id: 'chin',
+    label: 'Підборіддя',
+    technique: 'Подушечками пальців — від підборіддя вздовж щелепи до вуха',
     strokes: [
       [172, 136, 152, 365, 397]
     ],
     extrapolate: 'both',
     symmetricFrom: 2,
-    neckDrop: true
+    tailOpacity: 0.6,
+    tailLengthMult: 2.0
+  },
+  {
+    id: 'neck',
+    label: 'Шия',
+    technique: 'Від центру обома руками — в боки шиї, далі симетрично донизу',
+    strokes: [
+      [172, 136, 152, 365, 397]
+    ],
+    extrapolate: 'both',
+    symmetricFrom: 2,
+    neckDrop: true,
+    tailOpacity: 1,
+    tailLengthMult: 2.6,
+    dotIncludesTail: true
   }
 ];
-// Індекси зон 'temples' і 'undereye' — перше наближення, не перевірене наживо.
-// Обов'язково звірити через ?debugLandmarks=1 на реальному обличчі перед фінальним тестом.
+// Індекси зон forehead / nose-undereye / cheeks — новий підбір, не перевірений наживо.
+// Обов'язково звірити через ?debugLandmarks=1 і скоригувати за потреби.
 const DEBUG_LANDMARKS = new URLSearchParams(location.search).get('debugLandmarks') === '1';
 const DEBUG_FACE_SIGNALS = new URLSearchParams(location.search).get('debugFace') === '1';
 
@@ -575,7 +581,7 @@ const PREP_COPY = {
       'Нанесіть засіб по всьому обличчю — лоб, обидві щоки, ніс, підборіддя — і лише тоді починайте рух. Пальці мають ковзати, а не тягнути шкіру.',
       'Масажуйте подушечками пальців, дуже легко: тиск не сильніший, ніж коли розгладжуєте повіку.',
       'Сядьте так, щоб обличчя було в кадрі повністю, і приберіть волосся з лоба.',
-      'Пʼять зон по 15 секунд: лоб, скроні, під очима, щоки, щелепа й шия. Почнете, коли будете готові.'
+      'Пʼять зон по 15 секунд: лоб, ніс і під очима, щоки, підборіддя, шия. Почнете, коли будете готові.'
     ],
     note: 'Засоби DIPSY для обличчя ще готуються — поки скористайтесь тим, що вже маєте.',
     privacy: 'Друга частина використовує камеру, щоб бачити ваше обличчя. Відео обробляється у вашому браузері й нікуди не надсилається — нічого не записується.'
@@ -950,31 +956,17 @@ function drawTravelDot(x, y, elapsedMs){
   ctx.restore();
 }
 
-function drawZoneStroke(lm, indices, elapsedMs, extrapolate, symmetricFrom, neckDrop){
+function drawZoneStroke(lm, indices, elapsedMs, extrapolate, symmetricFrom, neckDrop, tailOpacity, tailLengthMult, dotIncludesTail){
   const W = overlay.width, H = overlay.height;
   const points = indices.map(i => ({ x: lm[i].x * W, y: lm[i].y * H }));
   if (points.length < 2) return;
 
+  const opacity = tailOpacity == null ? 0.5 : tailOpacity;
+  const lengthMult = tailLengthMult == null ? 1.4 : tailLengthMult;
+
   applyGuideStrokeStyle(elapsedMs, 1);
   strokeSmoothPath(points);
   ctx.stroke();
-
-  const travelT = (elapsedMs % ZONE_TRAVEL_MS) / ZONE_TRAVEL_MS;
-  if (typeof symmetricFrom === 'number' && points[symmetricFrom]){
-    const leftPts = points.slice(0, symmetricFrom + 1).slice().reverse();
-    const rightPts = points.slice(symmetricFrom);
-    if (leftPts.length >= 2){
-      const p = pointAlongPath(sampleSmoothPath(leftPts), travelT);
-      drawTravelDot(p.x, p.y, elapsedMs);
-    }
-    if (rightPts.length >= 2){
-      const p = pointAlongPath(sampleSmoothPath(rightPts), travelT);
-      drawTravelDot(p.x, p.y, elapsedMs);
-    }
-  } else {
-    const p = pointAlongPath(sampleSmoothPath(points), travelT);
-    drawTravelDot(p.x, p.y, elapsedMs);
-  }
 
   function extrapolateFrom(p0, p1){
     const dx = p1.x - p0.x, dy = p1.y - p0.y;
@@ -986,7 +978,7 @@ function drawZoneStroke(lm, indices, elapsedMs, extrapolate, symmetricFrom, neck
       const norm = Math.hypot(dirX, dirY) || 1;
       dirX /= norm; dirY /= norm;
     }
-    const extLen = len * 1.4;
+    const extLen = len * lengthMult;
     return { x: p1.x + dirX * extLen, y: p1.y + dirY * extLen };
   }
 
@@ -995,9 +987,11 @@ function drawZoneStroke(lm, indices, elapsedMs, extrapolate, symmetricFrom, neck
 
   const last = points[points.length - 1];
   const prev = points[points.length - 2];
+  let extEnd = null, extStart = null;
+
   if (doEnd){
-    const extEnd = extrapolateFrom(prev, last);
-    applyGuideStrokeStyle(elapsedMs, 0.5);
+    extEnd = extrapolateFrom(prev, last);
+    applyGuideStrokeStyle(elapsedMs, opacity);
     ctx.lineCap = 'butt';
     ctx.beginPath();
     ctx.moveTo(last.x, last.y);
@@ -1011,8 +1005,8 @@ function drawZoneStroke(lm, indices, elapsedMs, extrapolate, symmetricFrom, neck
   if (doStart){
     const first = points[0];
     const second = points[1];
-    const extStart = extrapolateFrom(second, first);
-    applyGuideStrokeStyle(elapsedMs, 0.5);
+    extStart = extrapolateFrom(second, first);
+    applyGuideStrokeStyle(elapsedMs, opacity);
     ctx.lineCap = 'butt';
     ctx.beginPath();
     ctx.moveTo(first.x, first.y);
@@ -1020,11 +1014,42 @@ function drawZoneStroke(lm, indices, elapsedMs, extrapolate, symmetricFrom, neck
     ctx.stroke();
     drawArrowhead(first, extStart);
   }
+
+  const travelT = (elapsedMs % ZONE_TRAVEL_MS) / ZONE_TRAVEL_MS;
+  if (typeof symmetricFrom === 'number' && points[symmetricFrom]){
+    let leftPts = points.slice(0, symmetricFrom + 1).slice().reverse();
+    let rightPts = points.slice(symmetricFrom);
+    if (dotIncludesTail){
+      if (extStart) leftPts = leftPts.concat([extStart]);
+      if (extEnd) rightPts = rightPts.concat([extEnd]);
+    }
+    if (leftPts.length >= 2){
+      const p = pointAlongPath(sampleSmoothPath(leftPts), travelT);
+      drawTravelDot(p.x, p.y, elapsedMs);
+    }
+    if (rightPts.length >= 2){
+      const p = pointAlongPath(sampleSmoothPath(rightPts), travelT);
+      drawTravelDot(p.x, p.y, elapsedMs);
+    }
+  } else {
+    let dotPoints = points;
+    if (dotIncludesTail){
+      dotPoints = points.slice();
+      if (extStart) dotPoints = [extStart].concat(dotPoints);
+      if (extEnd) dotPoints = dotPoints.concat([extEnd]);
+    }
+    const p = pointAlongPath(sampleSmoothPath(dotPoints), travelT);
+    drawTravelDot(p.x, p.y, elapsedMs);
+  }
 }
 
 function drawZoneGuide(lm, zone, elapsedMs){
   for (const stroke of zone.strokes){
-    drawZoneStroke(lm, stroke, elapsedMs, zone.extrapolate, zone.symmetricFrom, zone.neckDrop);
+    drawZoneStroke(
+      lm, stroke, elapsedMs, zone.extrapolate,
+      zone.symmetricFrom, zone.neckDrop,
+      zone.tailOpacity, zone.tailLengthMult, zone.dotIncludesTail
+    );
   }
 }
 
