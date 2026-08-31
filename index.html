@@ -403,7 +403,7 @@ const MASSAGE_ZONES = [
     technique: 'Від крил носа обома руками — в боки та вгору повз ділянку під очима до скронь',
     synthetic: 'arc',
     arcPairs: { right: [98, 234], left: [327, 454] },
-    bowFraction: 0.4,
+    bowFraction: -0.3,
     strokes: []
   },
   {
@@ -950,47 +950,35 @@ function computeForeheadPoints(lm, W, H){
   const midTop = { x: lm[10].x * W, y: lm[10].y * H };
   const dx = midTop.x - glabella.x, dy = midTop.y - glabella.y;
   const len = Math.hypot(dx, dy) || 1;
-  const top = {
+  const apex = {
     x: midTop.x + (dx / len) * len * 0.55,
     y: midTop.y + (dy / len) * len * 0.55
   };
-  const rightArm = [top,
-    { x: lm[108].x * W, y: lm[108].y * H },
-    { x: lm[103].x * W, y: lm[103].y * H },
-    { x: lm[54].x * W, y: lm[54].y * H },
-    { x: lm[21].x * W, y: lm[21].y * H }];
-  const leftArm = [top,
-    { x: lm[337].x * W, y: lm[337].y * H },
-    { x: lm[332].x * W, y: lm[332].y * H },
-    { x: lm[284].x * W, y: lm[284].y * H },
-    { x: lm[251].x * W, y: lm[251].y * H }];
-  return { glabella, top, rightArm, leftArm };
+  const right = { x: lm[21].x * W, y: lm[21].y * H };
+  const left = { x: lm[251].x * W, y: lm[251].y * H };
+  return { glabella, apex, right, left };
 }
 
 function drawForeheadZone(lm, elapsedMs){
   const W = overlay.width, H = overlay.height;
-  const { glabella, top, rightArm, leftArm } = computeForeheadPoints(lm, W, H);
+  const { glabella, apex, right, left } = computeForeheadPoints(lm, W, H);
+  const rightArc = [glabella, apex, right];
+  const leftArc = [glabella, apex, left];
 
   applyGuideStrokeStyle(elapsedMs, 1);
-  strokeSmoothPath([glabella, top]);
+  strokeSmoothPath(rightArc);
   ctx.stroke();
+  drawArrowhead(apex, right);
 
   applyGuideStrokeStyle(elapsedMs, 1);
-  strokeSmoothPath(rightArm);
+  strokeSmoothPath(leftArc);
   ctx.stroke();
-  drawArrowhead(rightArm[rightArm.length - 2], rightArm[rightArm.length - 1]);
-
-  applyGuideStrokeStyle(elapsedMs, 1);
-  strokeSmoothPath(leftArm);
-  ctx.stroke();
-  drawArrowhead(leftArm[leftArm.length - 2], leftArm[leftArm.length - 1]);
+  drawArrowhead(apex, left);
 
   const travelT = (elapsedMs % ZONE_TRAVEL_MS) / ZONE_TRAVEL_MS;
-  const rightPath = [glabella, top].concat(rightArm.slice(1));
-  const leftPath = [glabella, top].concat(leftArm.slice(1));
-  const pRight = pointAlongPath(sampleSmoothPath(rightPath), travelT);
+  const pRight = pointAlongPath(sampleSmoothPath(rightArc), travelT);
   drawTravelDot(pRight.x, pRight.y, elapsedMs);
-  const pLeft = pointAlongPath(sampleSmoothPath(leftPath), travelT);
+  const pLeft = pointAlongPath(sampleSmoothPath(leftArc), travelT);
   drawTravelDot(pLeft.x, pLeft.y, elapsedMs);
 }
 
@@ -1004,17 +992,15 @@ function computeNeckPoints(lm, W, H){
     let dx = ref.x - center.x, dy = ref.y - center.y;
     const len = Math.hypot(dx, dy) || 1;
     dx /= len; dy /= len;
-    const wp1 = {
-      x: center.x + dx * jawWidth * 0.4,
-      y: center.y + (dy * 0.5 + 0.5) * jawWidth * 0.4
+    const elbow = {
+      x: center.x + dx * jawWidth * 0.55,
+      y: center.y + Math.abs(dy) * jawWidth * 0.08 + jawWidth * 0.05
     };
-    const downDx = dx * 0.25, downDy = 0.97;
-    const norm = Math.hypot(downDx, downDy) || 1;
-    const wp2 = {
-      x: wp1.x + (downDx / norm) * jawWidth * 0.6,
-      y: wp1.y + (downDy / norm) * jawWidth * 0.6
+    const end = {
+      x: elbow.x + dx * jawWidth * 0.15,
+      y: elbow.y + jawWidth * 0.75
     };
-    return [center, wp1, wp2];
+    return [center, elbow, end];
   }
 
   return { right: side(rightRef), left: side(leftRef) };
