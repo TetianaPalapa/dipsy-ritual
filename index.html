@@ -393,29 +393,27 @@ const MASSAGE_ZONES = [
   {
     id: 'forehead',
     label: 'Лоб',
-    technique: 'Двома руками — від центру вгору до лінії волосся, далі в боки до скронь',
-    strokes: [
-      [9, 10, 108, 69, 21],
-      [9, 10, 337, 299, 251]
-    ]
+    technique: 'Двома руками — від перенісся вгору до лінії волосся, далі в боки до скронь',
+    synthetic: 'forehead',
+    strokes: []
   },
   {
     id: 'nose-undereye',
     label: 'Ніс і під очима',
     technique: 'Від крил носа обома руками — в боки та вгору повз ділянку під очима до скронь',
-    strokes: [
-      [98, 205, 50, 234],
-      [327, 425, 280, 454]
-    ]
+    synthetic: 'arc',
+    arcPairs: { right: [98, 234], left: [327, 454] },
+    bowFraction: 0.4,
+    strokes: []
   },
   {
     id: 'cheeks',
     label: 'Щоки',
     technique: 'Від ділянки між губою й носом — в боки по щоках до середини вух',
-    strokes: [
-      [164, 214, 187, 132],
-      [164, 434, 411, 361]
-    ]
+    synthetic: 'arc',
+    arcPairs: { right: [164, 132], left: [164, 361] },
+    bowFraction: 0.12,
+    strokes: []
   },
   {
     id: 'chin',
@@ -432,20 +430,11 @@ const MASSAGE_ZONES = [
   {
     id: 'neck',
     label: 'Шия',
-    technique: 'Від центру обома руками — в боки шиї, далі симетрично донизу',
-    strokes: [
-      [172, 136, 152, 365, 397]
-    ],
-    extrapolate: 'both',
-    symmetricFrom: 2,
-    neckDrop: true,
-    tailOpacity: 1,
-    tailLengthMult: 2.6,
-    dotIncludesTail: true
+    technique: 'Трохи підніміть підборіддя. Від основи підборіддя, там де починається шия, обома руками — в боки шиї, далі донизу',
+    synthetic: 'neck',
+    strokes: []
   }
 ];
-// Індекси зон forehead / nose-undereye / cheeks — новий підбір, не перевірений наживо.
-// Обов'язково звірити через ?debugLandmarks=1 і скоригувати за потреби.
 const DEBUG_LANDMARKS = new URLSearchParams(location.search).get('debugLandmarks') === '1';
 const DEBUG_FACE_SIGNALS = new URLSearchParams(location.search).get('debugFace') === '1';
 
@@ -956,6 +945,138 @@ function drawTravelDot(x, y, elapsedMs){
   ctx.restore();
 }
 
+function computeForeheadPoints(lm, W, H){
+  const glabella = { x: lm[9].x * W, y: lm[9].y * H };
+  const midTop = { x: lm[10].x * W, y: lm[10].y * H };
+  const dx = midTop.x - glabella.x, dy = midTop.y - glabella.y;
+  const len = Math.hypot(dx, dy) || 1;
+  const top = {
+    x: midTop.x + (dx / len) * len * 0.55,
+    y: midTop.y + (dy / len) * len * 0.55
+  };
+  const rightArm = [top,
+    { x: lm[108].x * W, y: lm[108].y * H },
+    { x: lm[103].x * W, y: lm[103].y * H },
+    { x: lm[54].x * W, y: lm[54].y * H },
+    { x: lm[21].x * W, y: lm[21].y * H }];
+  const leftArm = [top,
+    { x: lm[337].x * W, y: lm[337].y * H },
+    { x: lm[332].x * W, y: lm[332].y * H },
+    { x: lm[284].x * W, y: lm[284].y * H },
+    { x: lm[251].x * W, y: lm[251].y * H }];
+  return { glabella, top, rightArm, leftArm };
+}
+
+function drawForeheadZone(lm, elapsedMs){
+  const W = overlay.width, H = overlay.height;
+  const { glabella, top, rightArm, leftArm } = computeForeheadPoints(lm, W, H);
+
+  applyGuideStrokeStyle(elapsedMs, 1);
+  strokeSmoothPath([glabella, top]);
+  ctx.stroke();
+
+  applyGuideStrokeStyle(elapsedMs, 1);
+  strokeSmoothPath(rightArm);
+  ctx.stroke();
+  drawArrowhead(rightArm[rightArm.length - 2], rightArm[rightArm.length - 1]);
+
+  applyGuideStrokeStyle(elapsedMs, 1);
+  strokeSmoothPath(leftArm);
+  ctx.stroke();
+  drawArrowhead(leftArm[leftArm.length - 2], leftArm[leftArm.length - 1]);
+
+  const travelT = (elapsedMs % ZONE_TRAVEL_MS) / ZONE_TRAVEL_MS;
+  const rightPath = [glabella, top].concat(rightArm.slice(1));
+  const leftPath = [glabella, top].concat(leftArm.slice(1));
+  const pRight = pointAlongPath(sampleSmoothPath(rightPath), travelT);
+  drawTravelDot(pRight.x, pRight.y, elapsedMs);
+  const pLeft = pointAlongPath(sampleSmoothPath(leftPath), travelT);
+  drawTravelDot(pLeft.x, pLeft.y, elapsedMs);
+}
+
+function computeNeckPoints(lm, W, H){
+  const center = { x: lm[152].x * W, y: lm[152].y * H };
+  const rightRef = { x: lm[397].x * W, y: lm[397].y * H };
+  const leftRef = { x: lm[172].x * W, y: lm[172].y * H };
+  const jawWidth = Math.hypot(rightRef.x - leftRef.x, rightRef.y - leftRef.y) || 1;
+
+  function side(ref){
+    let dx = ref.x - center.x, dy = ref.y - center.y;
+    const len = Math.hypot(dx, dy) || 1;
+    dx /= len; dy /= len;
+    const wp1 = {
+      x: center.x + dx * jawWidth * 0.4,
+      y: center.y + (dy * 0.5 + 0.5) * jawWidth * 0.4
+    };
+    const downDx = dx * 0.25, downDy = 0.97;
+    const norm = Math.hypot(downDx, downDy) || 1;
+    const wp2 = {
+      x: wp1.x + (downDx / norm) * jawWidth * 0.6,
+      y: wp1.y + (downDy / norm) * jawWidth * 0.6
+    };
+    return [center, wp1, wp2];
+  }
+
+  return { right: side(rightRef), left: side(leftRef) };
+}
+
+function drawNeckZone(lm, elapsedMs){
+  const W = overlay.width, H = overlay.height;
+  const { right, left } = computeNeckPoints(lm, W, H);
+
+  applyGuideStrokeStyle(elapsedMs, 1);
+  strokeSmoothPath(right);
+  ctx.stroke();
+  drawArrowhead(right[right.length - 2], right[right.length - 1]);
+
+  applyGuideStrokeStyle(elapsedMs, 1);
+  strokeSmoothPath(left);
+  ctx.stroke();
+  drawArrowhead(left[left.length - 2], left[left.length - 1]);
+
+  const travelT = (elapsedMs % ZONE_TRAVEL_MS) / ZONE_TRAVEL_MS;
+  const pRight = pointAlongPath(sampleSmoothPath(right), travelT);
+  drawTravelDot(pRight.x, pRight.y, elapsedMs);
+  const pLeft = pointAlongPath(sampleSmoothPath(left), travelT);
+  drawTravelDot(pLeft.x, pLeft.y, elapsedMs);
+}
+
+function computeArcPoints(lm, W, H, startIdx, endIdx, bowFraction){
+  const p0 = { x: lm[startIdx].x * W, y: lm[startIdx].y * H };
+  const p1 = { x: lm[endIdx].x * W, y: lm[endIdx].y * H };
+  const mx = (p0.x + p1.x) / 2, my = (p0.y + p1.y) / 2;
+  const dx = p1.x - p0.x, dy = p1.y - p0.y;
+  let nx = -dy, ny = dx;
+  const nlen = Math.hypot(nx, ny) || 1;
+  nx /= nlen; ny /= nlen;
+  if (ny > 0){ nx = -nx; ny = -ny; }
+  const segLen = Math.hypot(dx, dy);
+  const control = { x: mx + nx * segLen * bowFraction, y: my + ny * segLen * bowFraction };
+  return [p0, control, p1];
+}
+
+function drawArcZone(lm, elapsedMs, rightPair, leftPair, bowFraction){
+  const W = overlay.width, H = overlay.height;
+  const right = computeArcPoints(lm, W, H, rightPair[0], rightPair[1], bowFraction);
+  const left = computeArcPoints(lm, W, H, leftPair[0], leftPair[1], bowFraction);
+
+  applyGuideStrokeStyle(elapsedMs, 1);
+  strokeSmoothPath(right);
+  ctx.stroke();
+  drawArrowhead(right[1], right[2]);
+
+  applyGuideStrokeStyle(elapsedMs, 1);
+  strokeSmoothPath(left);
+  ctx.stroke();
+  drawArrowhead(left[1], left[2]);
+
+  const travelT = (elapsedMs % ZONE_TRAVEL_MS) / ZONE_TRAVEL_MS;
+  const pRight = pointAlongPath(sampleSmoothPath(right), travelT);
+  drawTravelDot(pRight.x, pRight.y, elapsedMs);
+  const pLeft = pointAlongPath(sampleSmoothPath(left), travelT);
+  drawTravelDot(pLeft.x, pLeft.y, elapsedMs);
+}
+
 function drawZoneStroke(lm, indices, elapsedMs, extrapolate, symmetricFrom, neckDrop, tailOpacity, tailLengthMult, dotIncludesTail){
   const W = overlay.width, H = overlay.height;
   const points = indices.map(i => ({ x: lm[i].x * W, y: lm[i].y * H }));
@@ -1044,6 +1165,18 @@ function drawZoneStroke(lm, indices, elapsedMs, extrapolate, symmetricFrom, neck
 }
 
 function drawZoneGuide(lm, zone, elapsedMs){
+  if (zone.synthetic === 'forehead'){
+    drawForeheadZone(lm, elapsedMs);
+    return;
+  }
+  if (zone.synthetic === 'neck'){
+    drawNeckZone(lm, elapsedMs);
+    return;
+  }
+  if (zone.synthetic === 'arc'){
+    drawArcZone(lm, elapsedMs, zone.arcPairs.right, zone.arcPairs.left, zone.bowFraction);
+    return;
+  }
   for (const stroke of zone.strokes){
     drawZoneStroke(
       lm, stroke, elapsedMs, zone.extrapolate,
