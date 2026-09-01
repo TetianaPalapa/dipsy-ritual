@@ -289,6 +289,36 @@
 </div>
 
 <script type="module">
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+const supabaseClient = createClient(
+  'https://rvgrukhgiuoskoylydes.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ2Z3J1a2hnaXVvc2tveWx5ZGVzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgyNDM2MjUsImV4cCI6MjEwMzgxOTYyNX0.E17zvOUYfV5tMhZhbYKIAZPK7xCKrDICw3r7CdG0UHo'
+);
+
+const RITUAL_SESSION_ID = (function(){
+  let id = sessionStorage.getItem('dipsy-session-id');
+  if (!id){
+    id = crypto.randomUUID();
+    sessionStorage.setItem('dipsy-session-id', id);
+  }
+  return id;
+})();
+
+async function trackEvent(ritualTypeArg, eventType, zoneId, meta){
+  try {
+    await supabaseClient.from('ritual_events').insert({
+      session_id: RITUAL_SESSION_ID,
+      ritual_type: ritualTypeArg,
+      event_type: eventType,
+      zone_id: zoneId || null,
+      meta: meta || null
+    });
+  } catch (e){
+    // тихо ігноруємо — аналітика ніколи не повинна ламати ритуал
+  }
+}
+
 /* =================================================================
    КОНФІГ
    Категорії й посилання — реальні, з dipsybydv.com.ua.
@@ -518,6 +548,7 @@ function answer(i, btnEl){
   answering = true;
   if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
   answers[qIndex] = i;
+  trackEvent('quiz', 'quiz_answer', null, { question_index: qIndex, answer_index: i });
 
   document.querySelectorAll('#q-options .option').forEach(el => el.disabled = true);
   if (btnEl) btnEl.classList.add('selected');
@@ -1338,6 +1369,7 @@ function faceLoop(){
   }
 
   if (faceZoneElapsedMs >= ZONE_DURATION_MS){
+    trackEvent('face', 'zone_completed', MASSAGE_ZONES[faceZoneIndex].id);
     faceZoneIndex++;
     faceZoneElapsedMs = 0;
     if (faceZoneIndex >= MASSAGE_ZONES.length){
@@ -1354,6 +1386,7 @@ function faceLoop(){
 
 async function startFaceRitual(){
   resetRitualStage();
+  trackEvent('face', 'ritual_started');
   applyStageMode();
   $('#rit-name').textContent = PREP_COPY.face.ritualLabel;
   $('#rit-cue').textContent  = PREP_COPY.face.ritualCue;
@@ -1407,6 +1440,7 @@ $('#face-ready-go').addEventListener('click', ()=>{
 
 async function startRitual(){
   resetRitualStage();
+  trackEvent('hand', 'ritual_started');
   applyStageMode();
   $('#zone-label').hidden = true;
   $('#zone-bar').hidden = true;
@@ -1607,6 +1641,7 @@ $('#quit-breathe').addEventListener('click', ()=>{
    ФІНАЛ
    ================================================================= */
 function finish(summary, productOverride){
+  trackEvent(ritualType, 'ritual_completed');
   $('#f-summary').textContent = summary;
   const p = productOverride || chosen;
   $('#f-kicker').textContent  = productOverride ? 'Поки готується лінійка для обличчя' : 'Підібрано для вас';
