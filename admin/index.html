@@ -120,15 +120,54 @@ $('#logout-btn').addEventListener('click', async () => {
 
 $('#refresh-btn').addEventListener('click', loadStats);
 
+$('#refresh-btn').addEventListener('click', loadStats);
+
+const COLUMN_LABELS = {
+  ritual_type: 'Тип ритуалу',
+  event_type: 'Подія',
+  total: 'Кількість',
+  zone_id: 'Зона',
+  completions: 'Завершень',
+  question_index: 'Питання',
+  answer_index: 'Відповідь'
+};
+
+const VALUE_LABELS = {
+  ritual_type: { hand: 'Руки', face: 'Обличчя', debug: 'Тест' },
+  event_type: {
+    ritual_started: 'Старт ритуалу',
+    ritual_completed: 'Завершення ритуалу',
+    zone_completed: 'Завершення зони',
+    quiz_answer: 'Відповідь квізу',
+    product_click: 'Клік у каталог'
+  },
+  zone_id: {
+    forehead: 'Лоб',
+    'nose-undereye': 'Ніс і під очима',
+    cheeks: 'Щоки',
+    chin: 'Підборіддя',
+    neck: 'Шия'
+  },
+  question_index: { 0: 'Питання 1', 1: 'Питання 2', 2: 'Питання 3', 3: 'Питання 4' },
+  answer_index: { 0: 'Відповідь 1', 1: 'Відповідь 2', 2: 'Відповідь 3', 3: 'Відповідь 4' }
+};
+
+function translateCell(col, value){
+  if (value === null || value === undefined) return '';
+  const map = VALUE_LABELS[col];
+  if (map && Object.prototype.hasOwnProperty.call(map, value)) return map[value];
+  return value;
+}
+
 function renderTable(container, rows){
   if (!rows || !rows.length){
     container.innerHTML = '<p class="empty">Даних ще немає</p>';
     return;
   }
   const cols = Object.keys(rows[0]);
-  const thead = `<tr>${cols.map(c => `<th>${c}</th>`).join('')}</tr>`;
+  const thead = `<tr>${cols.map(c => `<th>${COLUMN_LABELS[c] || c}</th>`).join('')}</tr>`;
   const tbody = rows.map(r =>
-    `<tr>${cols.map(c => `<td>${r[c] ?? ''}</td>`).join('')}</tr>`
+    `<tr>${cols.map(c => `<td>${translateCell(c, r[c])}</td>`).join('')}</tr>`
   ).join('');
   container.innerHTML = `<table><thead>${thead}</thead><tbody>${tbody}</tbody></table>`;
 }
