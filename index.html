@@ -400,10 +400,8 @@ const MASSAGE_ZONES = [
   {
     id: 'nose-undereye',
     label: 'Ніс і під очима',
-    technique: 'Від крил носа обома руками — в боки та вгору повз ділянку під очима до скронь',
-    synthetic: 'arc',
-    arcPairs: { right: [98, 234], left: [327, 454] },
-    bowFraction: -0.3,
+    technique: 'Від внутрішніх куточків очей обома руками — вздовж під очима до зовнішніх куточків, до скронь',
+    synthetic: 'undereye',
     strokes: []
   },
   {
@@ -1063,6 +1061,41 @@ function drawArcZone(lm, elapsedMs, rightPair, leftPair, bowFraction){
   drawTravelDot(pLeft.x, pLeft.y, elapsedMs);
 }
 
+function computeUndereyeSide(lm, W, H, innerIdx, outerIdx){
+  const inner = { x: lm[innerIdx].x * W, y: lm[innerIdx].y * H };
+  const outer = { x: lm[outerIdx].x * W, y: lm[outerIdx].y * H };
+  const eyeWidth = Math.hypot(outer.x - inner.x, outer.y - inner.y) || 1;
+  const start = { x: inner.x, y: inner.y + eyeWidth * 0.32 };
+  const end = { x: outer.x, y: outer.y + eyeWidth * 0.32 };
+  const control = {
+    x: (start.x + end.x) / 2,
+    y: (start.y + end.y) / 2 + eyeWidth * 0.22
+  };
+  return [start, control, end];
+}
+
+function drawUndereyeZone(lm, elapsedMs){
+  const W = overlay.width, H = overlay.height;
+  const right = computeUndereyeSide(lm, W, H, 133, 33);
+  const left = computeUndereyeSide(lm, W, H, 362, 263);
+
+  applyGuideStrokeStyle(elapsedMs, 1);
+  strokeSmoothPath(right);
+  ctx.stroke();
+  drawArrowhead(right[1], right[2]);
+
+  applyGuideStrokeStyle(elapsedMs, 1);
+  strokeSmoothPath(left);
+  ctx.stroke();
+  drawArrowhead(left[1], left[2]);
+
+  const travelT = (elapsedMs % ZONE_TRAVEL_MS) / ZONE_TRAVEL_MS;
+  const pRight = pointAlongPath(sampleSmoothPath(right), travelT);
+  drawTravelDot(pRight.x, pRight.y, elapsedMs);
+  const pLeft = pointAlongPath(sampleSmoothPath(left), travelT);
+  drawTravelDot(pLeft.x, pLeft.y, elapsedMs);
+}
+
 function drawZoneStroke(lm, indices, elapsedMs, extrapolate, symmetricFrom, neckDrop, tailOpacity, tailLengthMult, dotIncludesTail){
   const W = overlay.width, H = overlay.height;
   const points = indices.map(i => ({ x: lm[i].x * W, y: lm[i].y * H }));
@@ -1153,6 +1186,10 @@ function drawZoneStroke(lm, indices, elapsedMs, extrapolate, symmetricFrom, neck
 function drawZoneGuide(lm, zone, elapsedMs){
   if (zone.synthetic === 'forehead'){
     drawForeheadZone(lm, elapsedMs);
+    return;
+  }
+  if (zone.synthetic === 'undereye'){
+    drawUndereyeZone(lm, elapsedMs);
     return;
   }
   if (zone.synthetic === 'neck'){
