@@ -991,12 +991,12 @@ function computeNeckPoints(lm, W, H){
     const len = Math.hypot(dx, dy) || 1;
     dx /= len; dy /= len;
     const elbow = {
-      x: center.x + dx * jawWidth * 0.55,
-      y: center.y + Math.abs(dy) * jawWidth * 0.08 + jawWidth * 0.05
+      x: center.x + dx * jawWidth * 0.4,
+      y: center.y + Math.abs(dy) * jawWidth * 0.06 + jawWidth * 0.04
     };
     const end = {
-      x: elbow.x + dx * jawWidth * 0.15,
-      y: elbow.y + jawWidth * 0.75
+      x: elbow.x + dx * jawWidth * 0.1,
+      y: elbow.y + jawWidth * 0.5
     };
     return [center, elbow, end];
   }
@@ -1063,8 +1063,14 @@ function drawArcZone(lm, elapsedMs, rightPair, leftPair, bowFraction){
 
 function computeUndereyeSide(lm, W, H, innerIdx, outerIdx){
   const inner = { x: lm[innerIdx].x * W, y: lm[innerIdx].y * H };
-  const outer = { x: lm[outerIdx].x * W, y: lm[outerIdx].y * H };
-  const eyeWidth = Math.hypot(outer.x - inner.x, outer.y - inner.y) || 1;
+  const outerRaw = { x: lm[outerIdx].x * W, y: lm[outerIdx].y * H };
+  const eyeWidth = Math.hypot(outerRaw.x - inner.x, outerRaw.y - inner.y) || 1;
+  const dirX = (outerRaw.x - inner.x) / eyeWidth;
+  const dirY = (outerRaw.y - inner.y) / eyeWidth;
+  const outer = {
+    x: outerRaw.x + dirX * eyeWidth * 0.55,
+    y: outerRaw.y + dirY * eyeWidth * 0.55
+  };
   const start = { x: inner.x, y: inner.y + eyeWidth * 0.32 };
   const end = { x: outer.x, y: outer.y + eyeWidth * 0.32 };
   const control = {
