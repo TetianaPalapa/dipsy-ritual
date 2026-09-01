@@ -1651,6 +1651,11 @@ function finish(summary, productOverride){
   show('s-final');
 }
 
+$('#f-link').addEventListener('click', ()=>{
+  const p = document.querySelector('#f-product').textContent;
+  trackEvent(ritualType, 'product_click', null, { product: p });
+});
+
 $('#restart').addEventListener('click', ()=>{
   stopCamera();
   stopFaceCamera();
