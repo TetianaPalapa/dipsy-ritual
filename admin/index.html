@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DIPSY BY DV — Статистика</title>
+<style>
+  :root{
+    --wine:#622735;
+    --wine-soft:#8A4455;
+    --sand:#F4EDE7;
+    --cream:#FCFAF8;
+    --ink:#2A1A1E;
+    --muted:#8B7A7E;
+    --line:#E4D8D0;
+    --font-ui:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{
+    font-family:var(--font-ui);color:var(--ink);background:var(--sand);
+    margin:0;padding:24px;line-height:1.5;
+  }
+  .wrap{max-width:720px;margin:0 auto}
+  h1{font-size:22px;color:var(--wine);margin:0 0 24px}
+  h2{font-size:16px;color:var(--wine);margin:32px 0 10px}
+  .card{
+    background:var(--cream);border:1px solid var(--line);border-radius:14px;
+    padding:20px;margin-bottom:16px;
+  }
+  label{display:block;font-size:13px;color:var(--muted);margin:12px 0 4px}
+  input{
+    width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;
+    font-size:15px;font-family:var(--font-ui);background:#fff;color:var(--ink);
+  }
+  button{
+    cursor:pointer;border:0;border-radius:8px;padding:11px 18px;
+    background:var(--wine);color:#fff;font-size:14px;font-family:var(--font-ui);
+    margin-top:14px;
+  }
+  button:hover{background:var(--wine-soft)}
+  button.ghost{background:transparent;color:var(--muted);border:1px solid var(--line)}
+  .error{color:#a33;font-size:13px;margin-top:10px}
+  .empty{color:var(--muted);font-size:13.5px}
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--line)}
+  th{color:var(--muted);font-weight:500;font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+  .topbar{display:flex;justify-content:space-between;align-items:center}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div id="login-view">
+    <h1>DIPSY BY DV — Статистика ритуалу</h1>
+    <div class="card">
+      <form id="login-form">
+        <label for="email">Email</label>
+        <input id="email" type="email" required autocomplete="username">
+        <label for="password">Пароль</label>
+        <input id="password" type="password" required autocomplete="current-password">
+        <button type="submit">Увійти</button>
+        <div class="error" id="login-error"></div>
+      </form>
+    </div>
+  </div>
+
+  <div id="stats-view" hidden>
+    <div class="topbar">
+      <h1>Статистика ритуалу</h1>
+      <div>
+        <button class="ghost" id="refresh-btn">Оновити</button>
+        <button class="ghost" id="logout-btn">Вийти</button>
+      </div>
+    </div>
+
+    <h2>Загальна картина (по типу ритуалу й події)</h2>
+    <div class="card" id="events-table"></div>
+
+    <h2>Завершення зон обличчя</h2>
+    <div class="card" id="zones-table"></div>
+
+    <h2>Відповіді квізу</h2>
+    <div class="card" id="quiz-table"></div>
+  </div>
+
+</div>
+
+<script type="module">
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+const supabaseClient = createClient(
+  'https://rvgrukhgiuoskoylydes.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ2Z3J1a2hnaXVvc2tveWx5ZGVzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgyNDM2MjUsImV4cCI6MjEwMzgxOTYyNX0.E17zvOUYfV5tMhZhbYKIAZPK7xCKrDICw3r7CdG0UHo'
+);
+
+const $ = s => document.querySelector(s);
+
+function showLogin(){ $('#login-view').hidden = false; $('#stats-view').hidden = true; }
+function showStats(){ $('#login-view').hidden = true; $('#stats-view').hidden = false; loadStats(); }
+
+async function checkSession(){
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  if (session) showStats(); else showLogin();
+}
+
+$('#login-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  $('#login-error').textContent = '';
+  const email = $('#email').value.trim();
+  const password = $('#password').value;
+  const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+  if (error){ $('#login-error').textContent = 'Невірний email або пароль'; return; }
+  showStats();
+});
+
+$('#logout-btn').addEventListener('click', async () => {
+  await supabaseClient.auth.signOut();
+  showLogin();
+});
+
+$('#refresh-btn').addEventListener('click', loadStats);
+
+function renderTable(container, rows){
+  if (!rows || !rows.length){
+    container.innerHTML = '<p class="empty">Даних ще немає</p>';
+    return;
+  }
+  const cols = Object.keys(rows[0]);
+  const thead = `<tr>${cols.map(c => `<th>${c}</th>`).join('')}</tr>`;
+  const tbody = rows.map(r =>
+    `<tr>${cols.map(c => `<td>${r[c] ?? ''}</td>`).join('')}</tr>`
+  ).join('');
+  container.innerHTML = `<table><thead>${thead}</thead><tbody>${tbody}</tbody></table>`;
+}
+
+async function loadStats(){
+  const { data: events } = await supabaseClient.from('v_events_summary').select('*');
+  renderTable($('#events-table'), events);
+
+  const { data: zones } = await supabaseClient.from('v_zone_dropoff').select('*');
+  renderTable($('#zones-table'), zones);
+
+  const { data: quiz } = await supabaseClient.from('v_quiz_answers').select('*');
+  renderTable($('#quiz-table'), quiz);
+}
+
+checkSession();
+</script>
+</body>
+</html>
