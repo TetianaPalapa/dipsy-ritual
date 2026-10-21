@@ -91,12 +91,9 @@
     position:relative;display:flex;align-items:center;justify-content:center;
   }
   .brand-logo{
-    display:block;width:170px;height:auto;margin:10px auto 26px;
-    mix-blend-mode:multiply;
+    display:block;width:min(300px, 80%);height:auto;
+    margin:6px auto 28px;
     animation:breathe 5.5s ease-in-out infinite;
-  }
-  .orb-logo{
-    width:62%;height:auto;mix-blend-mode:multiply;
   }
   @keyframes breathe{0%,100%{transform:scale(1);opacity:.9}50%{transform:scale(1.07);opacity:1}}
   @media (prefers-reduced-motion:reduce){
@@ -190,7 +187,7 @@
 
   <!-- ============ 1. ІНТРО ============ -->
   <section class="screen active" id="s-intro">
-    <img class="brand-logo" src="logoDV.png" alt="DIPSY BY DV">
+    <img class="brand-logo" src="logo-trimmed.png" alt="DIPSY BY DV">
     <h1>Ритуал починається<br>не з покупки</h1>
     <p>Дві хвилини. Кілька питань про те, як ви зараз. Далі — короткий ритуал для рук, який ми пройдемо разом.</p>
     <p class="muted">Друга частина використовує камеру, щоб рахувати рухи. Відео залишається у вашому браузері й нікуди не надсилається.</p>
@@ -272,7 +269,7 @@
   <section class="screen" id="s-breathe">
     <p class="eyebrow">Ритуал · без камери</p>
     <h2>Просто дихайте разом з колом</h2>
-    <div class="orb" id="breathe-orb"><img class="orb-logo" src="logoDV.png" alt=""></div>
+    <div class="orb" id="breathe-orb"></div>
     <p style="text-align:center;font-size:17px" id="breathe-text">Вдих</p>
     <p class="muted" style="text-align:center">Залишилось: <span id="breathe-left">60</span> с</p>
     <div class="spacer"></div>
